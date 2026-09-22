@@ -10,6 +10,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Divider,
   IconButton,
   createTheme,
   ThemeProvider,
@@ -33,6 +34,14 @@ const STATUS_LABEL: Record<string, string> = {
   assigned_to_shipment: 'שויך להובלה',
   in_transit: 'בדרך',
   arrived_pending_verification: 'הגיע — ממתין לאימות',
+}
+
+// PU status that is "normal" given the shipment status — don't show chip for these
+const EXPECTED_PU_STATUS: Record<string, string> = {
+  not_sent: 'not_sent',
+  sent: 'in_transit',
+  arrived: 'arrived_pending_verification',
+  verified: 'verified',
 }
 
 const STATUS_COLOR: Record<string, 'default' | 'warning' | 'success' | 'info'> = {
@@ -106,15 +115,20 @@ function ShipmentCard({
             אין יחידות אריזה
           </Typography>
         ) : (
-          shipment.packingUnits.map((pu) => (
-            <Box key={pu.id} sx={{ mb: 1.5 }}>
+          shipment.packingUnits.map((pu, idx) => (
+            <Box key={pu.id}>
+              {idx > 0 && <Divider sx={{ my: 0.75 }} />}
+            <Box sx={{ p: 1, borderRadius: 1, bgcolor: 'rgba(0,0,0,0.06)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Chip
-                  label={STATUS_LABEL[pu.status] ?? pu.status}
-                  color={STATUS_COLOR[pu.status] ?? 'default'}
-                  size="small"
-                  sx={{ fontFamily: 'Heebo, sans-serif' }}
-                />
+                {/* TODO: remove `true ||` after preview — shows chip always for debugging */}
+                {(true || pu.status !== EXPECTED_PU_STATUS[shipment.status]) && (
+                  <Chip
+                    label={STATUS_LABEL[pu.status] ?? pu.status}
+                    color={STATUS_COLOR[pu.status] ?? 'default'}
+                    size="small"
+                    sx={{ fontFamily: 'Heebo, sans-serif' }}
+                  />
+                )}
                 <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontWeight: 600 }}>
                   {pu.description} {pu.serialNumber != null ? `(#${pu.serialNumber})` : ''}
                 </Typography>
@@ -132,6 +146,7 @@ function ShipmentCard({
                   ))}
                 </Box>
               )}
+            </Box>
             </Box>
           ))
         )}
