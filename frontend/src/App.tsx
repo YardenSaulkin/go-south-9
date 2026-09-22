@@ -16,6 +16,10 @@ const DEMO_USER = {
 export default function App() {
   const pathname = usePathname()
 
+  useEffect(() => {
+    if (pathname === '/') navigate('/home', { replace: true })
+  }, [])
+
   const handleNavigate = (route: NavigateRoute) => {
     console.log('navigate ->', route)
   }

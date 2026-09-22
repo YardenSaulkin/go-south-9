@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react'
 import { Box, ThemeProvider, createTheme } from '@mui/material'
+import createCache from '@emotion/cache'
+import { CacheProvider } from '@emotion/react'
+import rtlPlugin from 'stylis-plugin-rtl'
+
+// Flips MUI's left/right styles (label position, outline notch, etc.) for RTL.
+const rtlCache = createCache({ key: 'muirtl', stylisPlugins: [rtlPlugin] })
 
 const BROWN = '#6e4e37'
 const BROWN_DARK = '#5a3515'
@@ -30,28 +36,30 @@ const authTheme = createTheme({
 // Shared theme + desert background shell for the Home / Login / Sign Up screens.
 export default function AuthScreen({ children }: { children: ReactNode }) {
   return (
-    <ThemeProvider theme={authTheme}>
-      <Box
-        dir="rtl"
-        sx={{
-          width: '100%',
-          height: '100dvh',
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          backgroundImage:
-            'linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.1) 40%, rgba(0,0,0,0.25)), url(/desert-bg.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center top',
-          backgroundAttachment: 'fixed',
-          backgroundColor: '#c9a46a',
-          display: 'flex',
-          justifyContent: 'center',
-          px: 2,
-          py: 4,
-        }}
-      >
-        <Box sx={{ width: '100%', maxWidth: 440, my: 'auto' }}>{children}</Box>
-      </Box>
-    </ThemeProvider>
+    <CacheProvider value={rtlCache}>
+      <ThemeProvider theme={authTheme}>
+        <Box
+          dir="rtl"
+          sx={{
+            width: '100%',
+            height: '100dvh',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            backgroundImage:
+              'linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.1) 40%, rgba(0,0,0,0.25)), url(/desert-bg.jpg)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center top',
+            backgroundAttachment: 'fixed',
+            backgroundColor: '#c9a46a',
+            display: 'flex',
+            justifyContent: 'center',
+            px: 2,
+            py: 4,
+          }}
+        >
+          <Box sx={{ width: '100%', maxWidth: 440, my: 'auto' }}>{children}</Box>
+        </Box>
+      </ThemeProvider>
+    </CacheProvider>
   )
 }
