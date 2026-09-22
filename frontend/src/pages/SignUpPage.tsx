@@ -8,6 +8,7 @@ import {
   applyIssues,
   hasErrors,
   validateEmail,
+  validateOrgCode,
   validatePersonalNumber,
   validateRequired,
 } from '../components/auth/validation'
@@ -70,10 +71,30 @@ const FIELDS: FieldConfig[] = [
       slotProps: { htmlInput: { inputMode: 'email', dir: 'ltr', autoCapitalize: 'none' } },
     },
   },
-  { name: 'unit', label: 'יחידה', validate: (v) => validateRequired(v, 'יחידה') },
-  { name: 'branch', label: 'ענף', validate: (v) => validateRequired(v, 'ענף') },
-  { name: 'section', label: 'מדור', validate: (v) => validateRequired(v, 'מדור') },
-  { name: 'team', label: 'צוות', validate: (v) => validateRequired(v, 'צוות') },
+  {
+    name: 'unit',
+    label: 'קוד יחידה',
+    validate: (v) => validateOrgCode(v, 'יחידה'),
+    inputProps: { slotProps: { htmlInput: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 2 } } },
+  },
+  {
+    name: 'branch',
+    label: 'קוד ענף',
+    validate: (v) => validateOrgCode(v, 'ענף'),
+    inputProps: { slotProps: { htmlInput: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 2 } } },
+  },
+  {
+    name: 'section',
+    label: 'קוד מדור',
+    validate: (v) => validateOrgCode(v, 'מדור'),
+    inputProps: { slotProps: { htmlInput: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 2 } } },
+  },
+  {
+    name: 'team',
+    label: 'קוד צוות',
+    validate: (v) => validateOrgCode(v, 'צוות'),
+    inputProps: { slotProps: { htmlInput: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 2 } } },
+  },
 ]
 
 const EMPTY: SignUpData = {
@@ -112,9 +133,11 @@ export default function SignUpPage({ onSubmit }: SignUpPageProps) {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
+  const NUMERIC_FIELDS: Field[] = ['personalNumber', 'unit', 'branch', 'section', 'team']
+
   const handleChange = (field: FieldConfig) => (e: ChangeEvent<HTMLInputElement>) => {
     const value =
-      field.name === 'personalNumber' ? e.target.value.replace(/\D/g, '') : e.target.value
+      NUMERIC_FIELDS.includes(field.name) ? e.target.value.replace(/\D/g, '') : e.target.value
     setValues((prev) => ({ ...prev, [field.name]: value }))
     if (errors[field.name]) setErrors((prev) => ({ ...prev, [field.name]: field.validate(value) }))
   }

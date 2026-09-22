@@ -388,7 +388,7 @@ const FALLBACK_CRATES: CrateRow[] = [
     serialNumber: 56789,
     displaySerial: '56789',
     packingUnitType: 'קרטון מקוטע',
-    sourceDescription: 'יחידת מצו"ב | ענף חוכמה | מדור מוח | חדר 208',
+    sourceDescription: '01 | 01 | 01 | חדר 208',
     destinationDescription: JSON.stringify({ building: 'בניין A', floor: 'קומה 3', room: 'חדר 309' }),
     items: [
       { id: 'item-1', description: 'מחשב', quantity: 2 },
@@ -403,7 +403,7 @@ const FALLBACK_CRATES: CrateRow[] = [
     serialNumber: 56790,
     displaySerial: '56790',
     packingUnitType: 'קרטון אחיד',
-    sourceDescription: 'יחידת מצו"ב | ענף חוכמה | מדור מוח | חדר 208',
+    sourceDescription: '01 | 01 | 01 | חדר 208',
     destinationDescription: JSON.stringify({ building: 'בניין A', floor: 'קומה 3', room: 'חדר 309' }),
     items: [
       { id: 'item-3', description: 'מתג', quantity: 1 },

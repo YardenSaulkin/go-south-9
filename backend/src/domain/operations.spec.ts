@@ -17,7 +17,7 @@ import {
 
 const logisticsAccess = {
   role: UserRole.normal,
-  accessMador: 'מדור א',
+  accessMador: '01',
   accessUnitCode: null,
   canCreateShipments: true,
   canCreatePackingUnits: true,
@@ -25,17 +25,17 @@ const logisticsAccess = {
   canViewPackingUnits: true,
   canViewGlobalShipmentsDashboard: false,
   canApproveShipments: false,
-  dataVisibilityScope: 'mador',
+  dataVisibilityScope: '01',
 };
 
 describe('operational domain rules', () => {
   it('scopes a logistics user to their own mador', () => {
-    expect(canAccessMador(logisticsAccess, 'מדור א')).toBe(true);
-    expect(canAccessMador(logisticsAccess, 'מדור ב')).toBe(false);
+    expect(canAccessMador(logisticsAccess, '01')).toBe(true);
+    expect(canAccessMador(logisticsAccess, '02')).toBe(false);
     expect(
       canAccessMador(
         { ...logisticsAccess, role: UserRole.admin },
-        'מדור ב',
+        '02',
       ),
     ).toBe(true);
   });

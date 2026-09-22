@@ -11,7 +11,7 @@ export class ContextController {
     const [users, scopes] = await Promise.all([
       this.currentUsers.listDemoUsers(),
       db.orgScope.findMany({
-        orderBy: [{ unit: 'asc' }, { anaf: 'asc' }, { mador: 'asc' }],
+        orderBy: [{ orgCode: 'asc' }],
       }),
     ]);
 
