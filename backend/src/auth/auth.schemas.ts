@@ -12,15 +12,20 @@ const emailSchema = z
   .email('כתובת אימייל לא תקינה')
   .max(200);
 
+const orgCodeSegmentSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{2}$/, 'יש להזין קוד בן 2 ספרות (00–99)');
+
 export const signupSchema = z.object({
   firstName: z.string().trim().min(1, 'יש להזין שם פרטי').max(100),
   lastName: z.string().trim().min(1, 'יש להזין שם משפחה').max(100),
   personalNumber: personalNumberSchema,
   email: emailSchema,
-  unit: z.string().trim().min(1, 'יש להזין יחידה').max(100),
-  anaf: z.string().trim().min(1, 'יש להזין ענף').max(100),
-  mador: z.string().trim().min(1, 'יש להזין מדור').max(100),
-  team: z.string().trim().min(1, 'יש להזין צוות').max(100),
+  unit: orgCodeSegmentSchema,
+  anaf: orgCodeSegmentSchema,
+  mador: orgCodeSegmentSchema,
+  team: orgCodeSegmentSchema,
 });
 
 export const loginSchema = z.object({

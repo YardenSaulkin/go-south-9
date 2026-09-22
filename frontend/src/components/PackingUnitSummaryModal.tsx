@@ -25,9 +25,9 @@ export default function PackingUnitSummaryModal({
   open,
   serialNumber = '56789',
   source = {
-    unit: 'יחידת מצו"ב',
-    anaf: 'ענף חוכמה',
-    mador: 'מדור מוח',
+    unit: '',
+    anaf: '',
+    mador: '',
     room: 'חדר 208',
   },
   destination = {

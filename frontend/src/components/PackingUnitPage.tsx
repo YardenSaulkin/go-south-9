@@ -27,7 +27,6 @@ interface PackingUnit {
 }
 
 const PACKAGING_TYPES = ['קרטון מקוטע', 'קרטון אחיד', 'פלסטיק', 'זולב', 'תולדות']
-const BRANCHES = ['ענף א׳', 'ענף ב׳', 'ענף ג׳']
 const ROOMS = ['חדר 1', 'חדר 2', 'חדר 3']
 const WAREHOUSES = ['מחסן א׳', 'מחסן ב׳', 'מחסן ג׳']
 const FLOORS = ['קומה 1', 'קומה 2', 'קומה 3']
@@ -162,7 +161,7 @@ function CustomSelect({ value, placeholder, options, onChange }: CustomSelectPro
 export interface PackingUnitPageProps {
   onBack: () => void
   user?: { name: string; personalNumber?: string; role?: string } | null
-  orgScope?: { mador?: string; unit?: string | null; anaf?: string | null } | null
+  orgScope?: { mador?: string } | null
 }
 
 export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitPageProps) {
@@ -349,18 +348,25 @@ export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitP
                   component="input"
                   value={sourceText}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setSourceText(e.target.value)
+                    setSourceText(e.target.value.replace(/\D/g, '').slice(0, 2))
                   }
-                  placeholder="ו"
+                  placeholder="קוד יחידה"
+                  inputMode="numeric"
+                  maxLength={2}
                   sx={inputSx}
                 />
               </Box>
               <Box sx={{ flex: 1 }}>
-                <CustomSelect
+                <Box
+                  component="input"
                   value={branch}
-                  placeholder="בחר ענף"
-                  options={BRANCHES}
-                  onChange={setBranch}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setBranch(e.target.value.replace(/\D/g, '').slice(0, 2))
+                  }
+                  placeholder="קוד ענף"
+                  inputMode="numeric"
+                  maxLength={2}
+                  sx={inputSx}
                 />
               </Box>
             </Box>
@@ -624,9 +630,9 @@ export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitP
           open={summaryOpen}
           serialNumber={serialNumber}
           source={{
-            unit: sourceText || orgScope?.unit || 'יחידת מצו"ב',
-            anaf: branch || orgScope?.anaf || 'ענף חוכמה',
-            mador: orgScope?.mador || 'מדור מוח',
+            unit: sourceText || '',
+            anaf: branch || '',
+            mador: orgScope?.mador || '',
             room: room || warehouse || 'חדר 208',
           }}
           destination={{

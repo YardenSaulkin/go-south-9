@@ -18,9 +18,6 @@ export interface DemoUser {
 export interface OrgScope {
   id: string
   mador: string
-  unit: string | null
-  anaf: string | null
-  team: string | null
   description: string | null
 }
 
@@ -155,7 +152,6 @@ export interface AdminUserView {
   personalNumber: string | null
   role: 'admin' | 'poc' | 'normal'
   orgCode: string | null
-  orgNames: { unit: string; anaf: string; mador: string; team: string } | null
 }
 
 export interface PocShipment {

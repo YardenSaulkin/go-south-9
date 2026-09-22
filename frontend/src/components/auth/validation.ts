@@ -20,6 +20,13 @@ export function validateRequired(value: string, label: string): string | null {
   return value.trim() ? null : `יש להזין ${label}`
 }
 
+export function validateOrgCode(value: string, label: string): string | null {
+  const v = value.trim()
+  if (!v) return `יש להזין קוד ${label}`
+  if (!/^\d{2}$/.test(v)) return `קוד ${label} חייב להכיל 2 ספרות (00–99)`
+  return null
+}
+
 export function hasErrors(errors: Record<string, string | null>): boolean {
   return Object.values(errors).some(Boolean)
 }
