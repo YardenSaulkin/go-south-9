@@ -177,6 +177,7 @@ export interface PocDashboard {
   shipments: PocShipment[]
   pending: PocShipment[]
   verified: PocShipment[]
+  unitNames?: Record<string, string>
 }
 
 export async function fetchAdminUsers(userId: string): Promise<AdminUserView[]> {
