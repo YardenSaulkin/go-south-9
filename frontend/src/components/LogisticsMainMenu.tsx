@@ -10,6 +10,7 @@ import {
   Chip,
   MenuItem,
   ListItemIcon,
+  Button,
   createTheme,
   ThemeProvider,
 } from "@mui/material";
@@ -103,9 +104,9 @@ export default function LogisticsMainMenu({
   const roleLabel = user.role ? (ROLE_LABEL[user.role] ?? user.role) : null;
 
   const baseCards = activeTab === "sending" ? SENDING_CARDS : RECEIVING_CARDS;
-  const roleCards =
-    user.role === "admin" ? ADMIN_CARDS : user.role === "poc" ? POC_CARDS : [];
-  const cards = [...roleCards, ...baseCards];
+  const cards = baseCards;
+  const roleCard =
+    user.role === "admin" ? ADMIN_CARDS[0] : user.role === "poc" ? POC_CARDS[0] : null;
 
   const handleTabChange = (
     _: React.MouseEvent<HTMLElement>,
@@ -258,6 +259,33 @@ export default function LogisticsMainMenu({
               </MenuItem>
             </Menu>
           </Box>
+
+          {/* Role shortcut button — admin/POC only */}
+          {roleCard && (
+            <Button
+              onClick={() => onNavigate(roleCard.route)}
+              startIcon={<roleCard.Icon size={16} />}
+              size="small"
+              sx={{
+                fontFamily: 'Heebo, sans-serif',
+                fontWeight: 600,
+                fontSize: '0.82rem',
+                textTransform: 'none',
+                color: 'white',
+                bgcolor: 'rgba(139,94,60,0.55)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: '999px',
+                px: 2,
+                py: 0.5,
+                alignSelf: 'flex-start',
+                '&:hover': { bgcolor: 'rgba(139,94,60,0.75)' },
+              }}
+            >
+              {roleCard.label}
+            </Button>
+          )}
 
           {/* Pill Toggle */}
           <Box
