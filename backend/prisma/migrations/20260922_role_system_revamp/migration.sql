@@ -70,14 +70,15 @@ UPDATE users u
 SET org_code = (SELECT org_code FROM org_scopes os WHERE os.id = u.org_scope_id)
 WHERE u.org_scope_id IS NOT NULL;
 
--- 7. Drop plain-text hierarchy columns from users (kept on org_scopes for display)
+-- 7. Drop view first (it depends on users.mador), then drop the columns
+DROP VIEW IF EXISTS user_access_profiles;
+
 ALTER TABLE users DROP COLUMN IF EXISTS unit;
 ALTER TABLE users DROP COLUMN IF EXISTS anaf;
 ALTER TABLE users DROP COLUMN IF EXISTS mador;
 ALTER TABLE users DROP COLUMN IF EXISTS team;
 
 -- 8. Recreate the user_access_profiles view with new role semantics and POC fields
-DROP VIEW IF EXISTS user_access_profiles;
 
 CREATE VIEW user_access_profiles AS
 SELECT
