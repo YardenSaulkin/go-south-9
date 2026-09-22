@@ -3,12 +3,14 @@ import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { CurrentUserService } from './auth/current-user.service.js';
+import { AuthController } from './controllers/auth.controller.js';
 import { ContextController } from './controllers/context.controller.js';
 import { DashboardController } from './controllers/dashboard.controller.js';
 import { DistributionController } from './controllers/distribution.controller.js';
 import { PackingController } from './controllers/packing.controller.js';
 import { ReceivingController } from './controllers/receiving.controller.js';
 import { ShipmentController } from './controllers/shipment.controller.js';
+import { AuthService } from './services/auth.service.js';
 import { DashboardService } from './services/dashboard.service.js';
 import { DistributionService } from './services/distribution.service.js';
 import { PackingService } from './services/packing.service.js';
@@ -17,18 +19,28 @@ import { ShipmentService } from './services/shipment.service.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
+// Distributed tracing, auto-correlated logs, request/job metrics, error
+// telemetry, alarms, and more — out of the box. Sign up at
+// https://observe.nestjs.com and set the two variables below. Without real
+// credentials the collector answers 401 on every batch, so the module stays
+// unregistered until they are provided.
+const observeAppKey = process.env.OBSERVE_APP_KEY;
+const observeAppSecret = process.env.OBSERVE_APP_SECRET;
+
 @Module({
-  imports: [
-    // Distributed tracing, auto-correlated logs, request/job metrics, error
-    // telemetry, alarms, and more — out of the box. Sign up at https://observe.nestjs.com
-    ObserveModule.forRoot({
-      appKey: 'YOUR_APP_KEY',
-      appSecret: 'YOUR_APP_SECRET',
-      serviceId: 'backend',
-    }),
-  ],
+  imports:
+    observeAppKey && observeAppSecret
+      ? [
+          ObserveModule.forRoot({
+            appKey: observeAppKey,
+            appSecret: observeAppSecret,
+            serviceId: 'backend',
+          }),
+        ]
+      : [],
   controllers: [
     AppController,
+    AuthController,
     ContextController,
     PackingController,
     ShipmentController,
@@ -38,6 +50,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
   ],
   providers: [
     AppService,
+    AuthService,
     CurrentUserService,
     PackingService,
     ShipmentService,
