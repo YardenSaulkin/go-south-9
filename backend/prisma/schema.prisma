@@ -1,0 +1,287 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["views"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrgScopeLevel {
+  mador
+  team
+
+  @@map("org_scope_level")
+}
+
+enum UserRole {
+  super_user
+  logistics_user
+  regular_user
+
+  @@map("user_role")
+}
+
+enum ShipmentStatus {
+  not_sent
+  sent
+  arrived
+  verified
+
+  @@map("shipment_status")
+}
+
+enum PackingUnitStatus {
+  not_sent
+  assigned_to_shipment
+  in_transit
+  arrived_pending_verification
+  verified
+
+  @@map("packing_unit_status")
+}
+
+enum ItemStatus {
+  not_sent
+  assigned_to_packing_unit
+  in_transit
+  arrived_pending_verification
+  verified
+
+  @@map("item_status")
+}
+
+enum PackingUnitType {
+  personal_carton
+  professional_carton
+  pallet
+  dolav
+  bulk
+
+  @@map("packing_unit_type")
+}
+
+enum TransportType {
+  truck
+  other
+
+  @@map("transport_type")
+}
+
+enum DiscrepancyKind {
+  missing_packing_unit
+  missing_item
+  excess_item
+
+  @@map("discrepancy_kind")
+}
+
+enum DiscrepancyStatus {
+  pending
+  resolved
+  finalized
+
+  @@map("discrepancy_status")
+}
+
+model OrgScope {
+  id          String        @id @default(uuid()) @db.Uuid
+  scopeLevel  OrgScopeLevel @map("scope_level")
+  unit        String?
+  anaf        String?
+  mador       String
+  team        String?
+  description String?
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  users        User[]
+  shipments    Shipment[]
+  packingUnits PackingUnit[]
+  items        Item[]
+
+  @@map("org_scopes")
+}
+
+model User {
+  id              String   @id @default(uuid()) @db.Uuid
+  email           String
+  role            UserRole
+  unit            String?
+  anaf            String?
+  mador           String?
+  team            String?
+  orgScopeId      String?  @map("org_scope_id") @db.Uuid
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orgScope               OrgScope?          @relation(fields: [orgScopeId], references: [id])
+  createdBy              User?              @relation("UserCreatedBy", fields: [createdByUserId], references: [id])
+  createdUsers           User[]             @relation("UserCreatedBy")
+  ownedShipments         Shipment[]         @relation("ShipmentOwner")
+  createdShipments       Shipment[]         @relation("ShipmentCreator")
+  ownedPackingUnits      PackingUnit[]      @relation("PackingUnitOwner")
+  createdPackingUnits    PackingUnit[]      @relation("PackingUnitCreator")
+  ownedItems             Item[]             @relation("ItemOwner")
+  createdItems           Item[]             @relation("ItemCreator")
+  createdDiscrepancies   Discrepancy[]      @relation("DiscrepancyCreator")
+  finalizedDiscrepancies Discrepancy[]      @relation("DiscrepancyFinalizer")
+  operationRequests      OperationRequest[]
+  operationEvents        OperationEvent[]
+
+  @@map("users")
+}
+
+model Shipment {
+  id                     String         @id @default(uuid()) @db.Uuid
+  description            String
+  status                 ShipmentStatus
+  sourceDescription      String?        @map("source_description")
+  destinationDescription String?        @map("destination_description")
+  sourceRoomId           String?        @map("source_room_id")
+  destinationRoomId      String?        @map("destination_room_id")
+  orgScopeId             String         @map("org_scope_id") @db.Uuid
+  ownerUserId            String?        @map("owner_user_id") @db.Uuid
+  createdByUserId        String         @map("created_by_user_id") @db.Uuid
+  createdAt              DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  transportType          TransportType? @map("transport_type")
+  transportDescription   String?        @map("transport_description")
+  vehicleIdentifier      String?        @map("vehicle_identifier")
+  transportAt            DateTime?      @map("transport_at") @db.Timestamptz(6)
+  idempotencyKey         String?        @unique @map("idempotency_key")
+
+  orgScope      OrgScope      @relation(fields: [orgScopeId], references: [id])
+  owner         User?         @relation("ShipmentOwner", fields: [ownerUserId], references: [id])
+  createdBy     User          @relation("ShipmentCreator", fields: [createdByUserId], references: [id])
+  packingUnits  PackingUnit[]
+  discrepancies Discrepancy[]
+
+  @@map("shipments")
+}
+
+model PackingUnit {
+  id                     String            @id @default(uuid()) @db.Uuid
+  description            String
+  shipmentId             String?           @map("shipment_id") @db.Uuid
+  status                 PackingUnitStatus
+  sourceDescription      String?           @map("source_description")
+  destinationDescription String?           @map("destination_description")
+  sourceRoomId           String?           @map("source_room_id")
+  destinationRoomId      String?           @map("destination_room_id")
+  orgScopeId             String            @map("org_scope_id") @db.Uuid
+  ownerUserId            String?           @map("owner_user_id") @db.Uuid
+  createdByUserId        String            @map("created_by_user_id") @db.Uuid
+  createdAt              DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  packingUnitType        PackingUnitType?  @map("packing_unit_type")
+  serialNumber           Int?              @unique @default(autoincrement()) @map("serial_number")
+  idempotencyKey         String?           @unique @map("idempotency_key")
+
+  shipment      Shipment?     @relation(fields: [shipmentId], references: [id])
+  orgScope      OrgScope      @relation(fields: [orgScopeId], references: [id])
+  owner         User?         @relation("PackingUnitOwner", fields: [ownerUserId], references: [id])
+  createdBy     User          @relation("PackingUnitCreator", fields: [createdByUserId], references: [id])
+  items         Item[]
+  discrepancies Discrepancy[]
+
+  @@map("packing_units")
+}
+
+model Item {
+  id                     String     @id @default(uuid()) @db.Uuid
+  description            String
+  packingUnitId          String?    @map("packing_unit_id") @db.Uuid
+  status                 ItemStatus
+  sourceMappingReportId  String?    @map("source_mapping_report_id")
+  sourceRoomId           String?    @map("source_room_id")
+  sourceDescription      String?    @map("source_description")
+  destinationRoomId      String?    @map("destination_room_id")
+  destinationDescription String?    @map("destination_description")
+  orgScopeId             String     @map("org_scope_id") @db.Uuid
+  ownerUserId            String?    @map("owner_user_id") @db.Uuid
+  createdByUserId        String?    @map("created_by_user_id") @db.Uuid
+  createdAt              DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  quantity               Int        @default(1)
+  distributedQuantity    Int        @default(0) @map("distributed_quantity")
+
+  packingUnit   PackingUnit?  @relation(fields: [packingUnitId], references: [id])
+  orgScope      OrgScope      @relation(fields: [orgScopeId], references: [id])
+  owner         User?         @relation("ItemOwner", fields: [ownerUserId], references: [id])
+  createdBy     User?         @relation("ItemCreator", fields: [createdByUserId], references: [id])
+  discrepancies Discrepancy[]
+
+  @@map("items")
+}
+
+view UserAccessProfile {
+  userId                          String   @map("user_id") @db.Uuid
+  role                            UserRole
+  accessMador                     String?  @map("access_mador")
+  canCreateShipments              Boolean  @map("can_create_shipments")
+  canCreatePackingUnits           Boolean  @map("can_create_packing_units")
+  canViewShipments                Boolean  @map("can_view_shipments")
+  canViewPackingUnits             Boolean  @map("can_view_packing_units")
+  canViewGlobalShipmentsDashboard Boolean  @map("can_view_global_shipments_dashboard")
+  dataVisibilityScope             String?  @map("data_visibility_scope")
+
+  @@map("user_access_profiles")
+}
+
+model Discrepancy {
+  id                String            @id @default(uuid()) @db.Uuid
+  kind              DiscrepancyKind
+  status            DiscrepancyStatus @default(pending)
+  shipmentId        String?           @map("shipment_id") @db.Uuid
+  packingUnitId     String?           @map("packing_unit_id") @db.Uuid
+  itemId            String?           @map("item_id") @db.Uuid
+  expectedQuantity  Int               @map("expected_quantity")
+  actualQuantity    Int               @map("actual_quantity")
+  createdByUserId   String            @map("created_by_user_id") @db.Uuid
+  finalizedByUserId String?           @map("finalized_by_user_id") @db.Uuid
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  finalizedAt       DateTime?         @map("finalized_at") @db.Timestamptz(6)
+
+  shipment    Shipment?    @relation(fields: [shipmentId], references: [id])
+  packingUnit PackingUnit? @relation(fields: [packingUnitId], references: [id])
+  item        Item?        @relation(fields: [itemId], references: [id])
+  createdBy   User         @relation("DiscrepancyCreator", fields: [createdByUserId], references: [id])
+  finalizedBy User?        @relation("DiscrepancyFinalizer", fields: [finalizedByUserId], references: [id])
+
+  @@index([shipmentId, status])
+  @@index([packingUnitId, status])
+  @@map("discrepancies")
+}
+
+model OperationRequest {
+  id             String   @id @default(uuid()) @db.Uuid
+  operation      String
+  idempotencyKey String   @map("idempotency_key")
+  actorUserId    String   @map("actor_user_id") @db.Uuid
+  result         Json?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor User @relation(fields: [actorUserId], references: [id])
+
+  @@unique([operation, idempotencyKey])
+  @@map("operation_requests")
+}
+
+model OperationEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  actorUserId   String   @map("actor_user_id") @db.Uuid
+  entityType    String   @map("entity_type")
+  entityId      String   @map("entity_id") @db.Uuid
+  action        String
+  previousState Json?    @map("previous_state")
+  nextState     Json?    @map("next_state")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor User @relation(fields: [actorUserId], references: [id])
+
+  @@index([entityType, entityId, createdAt])
+  @@map("operation_events")
+}
