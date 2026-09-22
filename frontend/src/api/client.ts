@@ -1,7 +1,6 @@
 import { getCurrentUserId } from '../auth/session'
 
-const CONFIGURED_API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
-const API_BASE_URL = CONFIGURED_API_URL.replace(/\/api\/?$/, '').replace(/\/$/, '')
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
 
 export interface ApiIssue {
   path: string
@@ -33,8 +32,11 @@ function messageFor(status: number, body: ApiErrorBody | null): string {
   return 'הבקשה נכשלה, נסה שוב'
 }
 
+// Single place that talks to the backend. The API identifies the caller with
+// the `x-user-id` header, so it is attached whenever a user is signed in.
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const userId = getCurrentUserId()
+
   let response: Response
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
@@ -50,8 +52,10 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   }
 
   const body = (await response.json().catch(() => null)) as (ApiErrorBody & T) | null
+
   if (!response.ok) {
     throw new ApiError(messageFor(response.status, body), response.status, body?.issues ?? [])
   }
+
   return body as T
 }

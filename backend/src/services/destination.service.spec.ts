@@ -20,6 +20,7 @@ const user = {
   email: 'operator@example.com',
   role: UserRole.normal,
   orgScopeId: '123e4567-e89b-12d3-a456-426614174001',
+  orgCode: '12345678',
   mador: '56',
   access: {
     role: UserRole.normal,

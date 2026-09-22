@@ -4,10 +4,14 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { OrgScopeLevel, UserRole } from '@prisma/client';
-import type { Prisma } from '@prisma/client';
+import type { User } from '@prisma/client';
 import { db } from '../lib/db.js';
 import type { LoginInput, SignupInput } from '../auth/auth.schemas.js';
+import { OrgHierarchyService } from './org-hierarchy.service.js';
 
+// The app identifies the caller by the `x-user-id` header (see
+// CurrentUserService). Sign-up and login therefore return the user record, and
+// the client sends its id on subsequent requests.
 export interface AuthenticatedUser {
   id: string;
   firstName: string | null;
@@ -15,18 +19,11 @@ export interface AuthenticatedUser {
   personalNumber: string | null;
   email: string;
   role: UserRole;
-  unit: string | null;
-  anaf: string | null;
-  mador: string | null;
-  team: string | null;
   orgScopeId: string | null;
   orgCode: string | null;
 }
 
-type UserWithOrgScope = Prisma.UserGetPayload<{ include: { orgScope: true } }>;
-
-function toAuthenticatedUser(user: UserWithOrgScope): AuthenticatedUser {
-  const organization = user.orgScope;
+function toAuthenticatedUser(user: User): AuthenticatedUser {
   return {
     id: user.id,
     firstName: user.firstName,
@@ -34,17 +31,15 @@ function toAuthenticatedUser(user: UserWithOrgScope): AuthenticatedUser {
     personalNumber: user.personalNumber,
     email: user.email,
     role: user.role,
-    unit: organization?.unit ?? null,
-    anaf: organization?.anaf ?? null,
-    mador: organization?.mador ?? null,
-    team: organization?.team ?? null,
     orgScopeId: user.orgScopeId,
-    orgCode: user.orgCode ?? organization?.orgCode ?? null,
+    orgCode: user.orgCode,
   };
 }
 
 @Injectable()
 export class AuthService {
+  constructor(private readonly orgHierarchy: OrgHierarchyService) {}
+
   async signup(input: SignupInput): Promise<AuthenticatedUser> {
     const [existingByPersonalNumber, existingByEmail] = await Promise.all([
       db.user.findUnique({ where: { personalNumber: input.personalNumber } }),
@@ -60,7 +55,15 @@ export class AuthService {
       throw new ConflictException('כתובת אימייל זו כבר רשומה במערכת');
     }
 
-    const orgScope = await this.findOrCreateOrgScope(input);
+    const orgCode = await this.orgHierarchy.computeOrgCode(
+      input.unit,
+      input.anaf,
+      input.mador,
+      input.team,
+    );
+
+    const orgScope = await this.findOrCreateOrgScope(input, orgCode);
+
     const user = await db.user.create({
       data: {
         firstName: input.firstName,
@@ -69,9 +72,8 @@ export class AuthService {
         email: input.email,
         role: UserRole.normal,
         orgScopeId: orgScope.id,
-        orgCode: orgScope.orgCode,
+        orgCode,
       },
-      include: { orgScope: true },
     });
 
     return toAuthenticatedUser(user);
@@ -80,9 +82,10 @@ export class AuthService {
   async login(input: LoginInput): Promise<AuthenticatedUser> {
     const user = await db.user.findUnique({
       where: { personalNumber: input.personalNumber },
-      include: { orgScope: true },
     });
 
+    // One message for both cases, so the response does not reveal which
+    // personal numbers are registered.
     if (!user || user.email.toLowerCase() !== input.email) {
       throw new UnauthorizedException('מספר אישי או אימייל שגויים');
     }
@@ -90,15 +93,10 @@ export class AuthService {
     return toAuthenticatedUser(user);
   }
 
-  private async findOrCreateOrgScope(input: SignupInput) {
-    const existing = await db.orgScope.findFirst({
-      where: {
-        unit: input.unit,
-        anaf: input.anaf,
-        mador: input.mador,
-        team: input.team,
-      },
-    });
+  // Users must belong to an org scope, otherwise the user_access_profiles view
+  // resolves no mador and the operations endpoints reject them.
+  private async findOrCreateOrgScope(input: SignupInput, orgCode: string) {
+    const existing = await db.orgScope.findFirst({ where: { orgCode } });
     if (existing) return existing;
 
     return db.orgScope.create({
@@ -108,6 +106,7 @@ export class AuthService {
         anaf: input.anaf,
         mador: input.mador,
         team: input.team,
+        orgCode,
       },
     });
   }

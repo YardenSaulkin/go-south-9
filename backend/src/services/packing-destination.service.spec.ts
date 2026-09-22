@@ -37,6 +37,7 @@ const user = {
   email: 'operator@example.com',
   role: UserRole.normal,
   orgScopeId: scope.id,
+  orgCode: scope.orgCode,
   mador: scope.mador,
   access: {
     role: UserRole.normal,
@@ -98,7 +99,6 @@ describe('packing destination persistence', () => {
       orgScopeId: scope.id,
       sourceRoomId: 'Room 100',
       sourceDescription: 'מחסן תקשורת קומה ב׳',
-      destinationId: existingDestination.id,
       destinationRoomId: existingDestination.destinationCode,
       destinationDescription: JSON.stringify({
         id: existingDestination.id,
@@ -110,7 +110,6 @@ describe('packing destination persistence', () => {
       }),
       createdBy: { email: user.email },
       orgScope: scope,
-      destination: existingDestination,
       items: [],
     };
     mocks.createPackingUnit.mockResolvedValue(created);
@@ -140,7 +139,6 @@ describe('packing destination persistence', () => {
     expect(mocks.createPackingUnit).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         sourceDescription: 'מחסן תקשורת קומה ב׳',
-        destinationId: existingDestination.id,
         destinationRoomId: existingDestination.destinationCode,
       }),
     }));

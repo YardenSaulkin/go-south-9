@@ -39,7 +39,7 @@ export class ShipmentService {
             where: { id: input.orgScopeId },
           });
           if (!scope) throw new NotFoundException('המסגרת הארגונית לא נמצאה');
-          assertCanCreateShipment(user.access, scope.mador, scope.orgCode?.trim().slice(0, 2));
+          assertCanCreateShipment(user.access, scope.mador, scope.orgCode);
 
           const packingUnits = await tx.packingUnit.findMany({
             where: { id: { in: input.packingUnitIds } },
@@ -52,9 +52,12 @@ export class ShipmentService {
             data: {
               description: input.description,
               status: ShipmentStatus.not_sent,
-              destinationRoomId:
-                input.destination.roomId ?? input.destination.room,
-              destinationDescription: JSON.stringify(input.destination),
+              destinationRoomId: input.destination
+                ? (input.destination.roomId ?? input.destination.room)
+                : undefined,
+              destinationDescription: input.destination
+                ? JSON.stringify(input.destination)
+                : undefined,
               orgScopeId: scope.id,
               ownerUserId: user.id,
               createdByUserId: user.id,

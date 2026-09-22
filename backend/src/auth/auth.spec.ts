@@ -26,6 +26,9 @@ vi.mock('../lib/db.js', () => ({
 
 import { loginSchema } from './auth.schemas.js';
 import { AuthService } from '../services/auth.service.js';
+import type { OrgHierarchyService } from '../services/org-hierarchy.service.js';
+
+const authService = () => new AuthService({} as OrgHierarchyService);
 
 const persistedUser = {
   id: '123e4567-e89b-12d3-a456-426614174000',
@@ -65,29 +68,25 @@ describe('authentication regression', () => {
   });
 
   it.each([UserRole.normal, UserRole.poc, UserRole.admin])(
-    'returns a %s user with organization data loaded through orgScope',
+    'returns a %s user using the canonical user orgCode',
     async (role) => {
       databaseMocks.findUnique.mockResolvedValue({ ...persistedUser, role });
 
-      const result = await new AuthService().login({
+      const result = await authService().login({
         personalNumber: '1234567',
         email: 'operator@example.com',
       });
 
       expect(databaseMocks.findUnique).toHaveBeenCalledWith({
         where: { personalNumber: '1234567' },
-        include: { orgScope: true },
       });
       expect(result).toMatchObject({
         id: persistedUser.id,
         personalNumber: '1234567',
         email: 'operator@example.com',
         role,
-        unit: 'יחידה א',
-        anaf: 'ענף א',
-        mador: 'מדור א',
-        team: 'צוות א',
         orgCode: '12345678',
+        orgScopeId: persistedUser.orgScopeId,
       });
     },
   );
@@ -96,7 +95,7 @@ describe('authentication regression', () => {
     databaseMocks.findUnique.mockResolvedValue(persistedUser);
 
     await expect(
-      new AuthService().login({
+      authService().login({
         personalNumber: '1234567',
         email: 'wrong@example.com',
       }),

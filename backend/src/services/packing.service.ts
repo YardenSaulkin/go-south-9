@@ -13,7 +13,7 @@ import {
 } from '@prisma/client';
 import type { CurrentUser } from '../auth/current-user.service.js';
 import {
-  assertCanAccessMador,
+  assertCanAccessOrgScope,
   assertCanCreatePackingUnit,
 } from '../domain/permissions.js';
 import {
@@ -99,7 +99,7 @@ export class PackingService {
   private async getScope(user: CurrentUser, orgScopeId: string) {
     const scope = await db.orgScope.findUnique({ where: { id: orgScopeId } });
     if (!scope) throw new NotFoundException('המסגרת הארגונית לא נמצאה');
-    assertCanAccessMador(user.access, scope.mador, scope.orgCode?.trim().slice(0, 2));
+    assertCanAccessOrgScope(user.access, scope.mador, scope.orgCode);
     return scope;
   }
 
@@ -290,7 +290,7 @@ export class PackingService {
 
     const existing = await db.packingUnit.findFirst({
       where: { idempotencyKey: input.idempotencyKey },
-      include: { items: true, createdBy: true, orgScope: true, destination: true },
+      include: { items: true, createdBy: true, orgScope: true },
     });
     if (existing) {
       if (
@@ -311,7 +311,7 @@ export class PackingService {
             where: { id: input.orgScopeId },
           });
           if (!scope) throw new NotFoundException('המסגרת הארגונית לא נמצאה');
-          assertCanCreatePackingUnit(user.access, scope.mador, scope.orgCode?.trim().slice(0, 2));
+          assertCanCreatePackingUnit(user.access, scope.mador, scope.orgCode);
 
           const sourceRoom = await this.resolveSourceRoom(
             tx,
@@ -338,7 +338,6 @@ export class PackingService {
               packingUnitType: input.packingUnitType,
               sourceRoomId: input.sourceRoomId,
               sourceDescription: sourceRoom.description,
-              destinationId: destination.id,
               destinationRoomId: destination.destinationCode,
               destinationDescription: serializeDestination(destination),
               orgScopeId: scope.id,
@@ -439,7 +438,7 @@ export class PackingService {
 
           return tx.packingUnit.findUniqueOrThrow({
             where: { id: packingUnit.id },
-            include: { items: true, createdBy: true, orgScope: true, destination: true },
+            include: { items: true, createdBy: true, orgScope: true },
           });
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -453,7 +452,7 @@ export class PackingService {
       ) {
         const duplicate = await db.packingUnit.findFirst({
           where: { idempotencyKey: input.idempotencyKey },
-          include: { items: true, createdBy: true, orgScope: true, destination: true },
+          include: { items: true, createdBy: true, orgScope: true },
         });
         if (duplicate) {
           if (
@@ -471,7 +470,7 @@ export class PackingService {
 
   private toSuccessResponse(
     unit: Prisma.PackingUnitGetPayload<{
-      include: { items: true; createdBy: true; orgScope: true; destination: true };
+      include: { items: true; createdBy: true; orgScope: true };
     }>,
     fallbackPacker: string,
   ) {
@@ -496,9 +495,9 @@ export class PackingService {
         sourceDescription: unit.sourceDescription,
       },
       destination: destination ?? {
-        id: unit.destinationId,
-        code: unit.destination?.destinationCode ?? unit.destinationRoomId ?? '',
-        description: unit.destination?.description ?? '',
+        id: null,
+        code: unit.destinationRoomId ?? '',
+        description: '',
         building: '',
         floor: '',
         room: unit.destinationRoomId ?? '',

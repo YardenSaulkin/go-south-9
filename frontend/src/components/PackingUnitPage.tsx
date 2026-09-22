@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
-import { ApiError, api, type AppContext, type CreatePackingUnitRequest, type Destination, type EligibleItem, type PackingSuccessResponse, type RoomMappingStatus, type SourceRoom, type SourceRoomDetails } from '../api'
+import { ApiError, packingApi as api, type AppContext, type CreatePackingUnitRequest, type Destination, type EligibleItem, type PackingSuccessResponse, type RoomMappingStatus, type SourceRoom, type SourceRoomDetails } from '../lib/api'
 
 export interface PackingDraft {
   orgScopeId: string
@@ -112,7 +112,7 @@ export default function PackingUnitPage({ onBack, initialDraft, authenticatedUse
 
   useEffect(() => {
     let active = true
-    api.getContext().then((value) => {
+    api.getContext(authenticatedUserId).then((value) => {
       if (!active) return
       setContext(value)
       setSource((current) => {
@@ -131,7 +131,7 @@ export default function PackingUnitPage({ onBack, initialDraft, authenticatedUse
       })
     }).catch((reason: unknown) => { if (active) setContextError(errorMessage(reason)) })
     return () => { active = false }
-  }, [])
+  }, [authenticatedUserId])
 
   const userId = authenticatedUserId
   const scopes = context?.scopes ?? []

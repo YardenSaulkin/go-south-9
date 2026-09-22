@@ -9,44 +9,12 @@ export interface CurrentUser {
   email: string;
   role: UserRole;
   orgScopeId: string | null;
-  mador: string | null;
+  orgCode: string | null;
   access: AccessProfile;
 }
 
 @Injectable()
 export class CurrentUserService {
-  listDemoUsers() {
-    return db.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        orgCode: true,
-        orgScopeId: true,
-        orgScope: {
-          select: {
-            unit: true,
-            anaf: true,
-            mador: true,
-            team: true,
-            orgCode: true,
-          },
-        },
-      },
-      orderBy: { email: 'asc' },
-    }).then((users) => users.map((user) => ({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      mador: user.orgScope?.mador ?? null,
-      team: user.orgScope?.team ?? null,
-      orgScopeId: user.orgScopeId,
-      orgCode: user.orgCode ?? user.orgScope?.orgCode ?? null,
-      unit: user.orgScope?.unit ?? null,
-      anaf: user.orgScope?.anaf ?? null,
-    })));
-  }
-
   async require(headerValue: string | undefined): Promise<CurrentUser> {
     const parsedId = uuidSchema.safeParse(headerValue);
     if (!parsedId.success) {
@@ -54,10 +22,7 @@ export class CurrentUserService {
     }
 
     const [user, access] = await Promise.all([
-      db.user.findUnique({
-        where: { id: parsedId.data },
-        include: { orgScope: true },
-      }),
+      db.user.findUnique({ where: { id: parsedId.data } }),
       db.userAccessProfile.findFirst({ where: { userId: parsedId.data } }),
     ]);
 
@@ -65,19 +30,24 @@ export class CurrentUserService {
       throw new UnauthorizedException('המשתמש אינו קיים או חסר פרופיל הרשאות');
     }
 
-    const accessProfile: AccessProfile = {
-      ...access,
-      accessUnitCode: access.accessUnitCode ?? null,
-      canApproveShipments: Boolean(access.canApproveShipments),
-    };
-
     return {
       id: user.id,
       email: user.email,
-      role: accessProfile.role,
+      role: user.role,
       orgScopeId: user.orgScopeId,
-      mador: user.orgScope?.mador ?? null,
-      access: accessProfile,
+      orgCode: user.orgCode,
+      access: {
+        role: access.role,
+        accessMador: access.accessMador,
+        accessUnitCode: access.accessUnitCode,
+        canCreateShipments: access.canCreateShipments,
+        canCreatePackingUnits: access.canCreatePackingUnits,
+        canViewShipments: access.canViewShipments,
+        canViewPackingUnits: access.canViewPackingUnits,
+        canViewGlobalShipmentsDashboard: access.canViewGlobalShipmentsDashboard,
+        canApproveShipments: access.canApproveShipments,
+        dataVisibilityScope: access.dataVisibilityScope,
+      },
     };
   }
 }

@@ -98,6 +98,7 @@ const NO_ERRORS: Errors = {
   team: null,
 }
 
+// The form labels ענף / מדור map onto the backend's anaf / mador fields.
 const FIELD_BY_API_NAME: Record<string, Field> = { anaf: 'branch', mador: 'section' }
 
 function toSignupPayload(data: SignUpData): SignupPayload {

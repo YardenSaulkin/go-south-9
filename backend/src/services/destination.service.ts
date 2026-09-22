@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { CurrentUser } from '../auth/current-user.service.js';
-import { assertCanAccessMador } from '../domain/permissions.js';
+import { assertCanAccessOrgScope } from '../domain/permissions.js';
 import { db } from '../lib/db.js';
 
 @Injectable()
@@ -8,7 +8,7 @@ export class DestinationService {
   async search(user: CurrentUser, orgScopeId: string, search: string) {
     const scope = await db.orgScope.findUnique({ where: { id: orgScopeId } });
     if (!scope) throw new NotFoundException('המסגרת הארגונית לא נמצאה');
-    assertCanAccessMador(user.access, scope.mador, scope.orgCode?.trim().slice(0, 2));
+    assertCanAccessOrgScope(user.access, scope.mador, scope.orgCode);
 
     const normalizedSearch = search.trim();
     return db.destination.findMany({
