@@ -120,11 +120,11 @@ function ShipmentCard({
               {idx > 0 && <Divider sx={{ my: 0.75 }} />}
             <Box sx={{ p: 1, borderRadius: 1, bgcolor: 'rgba(0,0,0,0.06)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {/* TODO: remove `true ||` after preview — shows chip always for debugging */}
+                {/* TODO: remove `true ||` after preview */}
                 {(true || pu.status !== EXPECTED_PU_STATUS[shipment.status]) && (
                   <Chip
                     label={STATUS_LABEL[pu.status] ?? pu.status}
-                    color={STATUS_COLOR[pu.status] ?? 'default'}
+                    color="error"
                     size="small"
                     sx={{ fontFamily: 'Heebo, sans-serif' }}
                   />
