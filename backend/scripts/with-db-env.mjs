@@ -40,6 +40,7 @@ const databaseUrl = normalizePostgresUrl(
 const result = spawnSync(command, args, {
   env: { ...process.env, DATABASE_URL: databaseUrl },
   stdio: 'inherit',
+  shell: true,
 });
 
 process.exit(result.status ?? 1);

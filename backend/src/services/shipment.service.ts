@@ -52,9 +52,12 @@ export class ShipmentService {
             data: {
               description: input.description,
               status: ShipmentStatus.not_sent,
-              destinationRoomId:
-                input.destination.roomId ?? input.destination.room,
-              destinationDescription: JSON.stringify(input.destination),
+              destinationRoomId: input.destination
+                ? (input.destination.roomId ?? input.destination.room)
+                : undefined,
+              destinationDescription: input.destination
+                ? JSON.stringify(input.destination)
+                : undefined,
               orgScopeId: scope.id,
               ownerUserId: user.id,
               createdByUserId: user.id,
