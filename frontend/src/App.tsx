@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import LogisticsMainMenu from './components/LogisticsMainMenu'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
@@ -6,40 +6,28 @@ import SignUpPage from './pages/SignUpPage'
 import { navigate, usePathname } from './navigation'
 import PackingUnitPage from './components/PackingUnitPage'
 import ShipmentPage from './components/ShipmentPage'
-import { fetchContext, type DemoUser, type OrgScope } from './lib/api'
+import { useCurrentUser } from './auth/useCurrentUser'
+import { clearCurrentUser, userDisplayName, userRoleLabel } from './auth/session'
 
 type NavigateRoute = 'packing' | 'transport' | 'receiving' | 'distribution'
 
-const FALLBACK_USER = {
-  name: 'דני',
-  personalNumber: '1234567',
-  role: 'מפקד',
-}
+const PUBLIC_ROUTES = ['/home', '/login', '/signup']
 
 export default function App() {
   const pathname = usePathname()
-  const [demoUser, setDemoUser] = useState<DemoUser | null>(null)
-  const [orgScope, setOrgScope] = useState<OrgScope | null>(null)
+  const user = useCurrentUser()
 
   useEffect(() => {
     if (pathname === '/') navigate('/home', { replace: true })
   }, [])
 
+  // Everything past the auth pages is rendered from the signed-in user's own
+  // record, so send anyone without a session back to the home page.
   useEffect(() => {
-    fetchContext()
-      .then(({ users, scopes }) => {
-        const logisticsUser = users.find((u) => u.role === 'logistics_user') ?? users[0]
-        if (!logisticsUser) return
-        setDemoUser(logisticsUser)
-        if (logisticsUser.orgScopeId) {
-          const scope = scopes.find((s) => s.id === logisticsUser.orgScopeId) ?? scopes[0]
-          setOrgScope(scope ?? null)
-        } else if (scopes.length > 0) {
-          setOrgScope(scopes[0])
-        }
-      })
-      .catch((err) => console.warn('Could not load backend context:', err))
-  }, [])
+    if (!user && pathname !== '/' && !PUBLIC_ROUTES.includes(pathname)) {
+      navigate('/home', { replace: true })
+    }
+  }, [user, pathname])
 
   const handleNavigate = (route: NavigateRoute) => {
     if (route === 'packing') navigate('/packing')
@@ -49,22 +37,30 @@ export default function App() {
 
   const handleBack = () => navigate('/menu')
 
-  const displayUser = demoUser
-    ? { name: demoUser.email.split('@')[0], personalNumber: demoUser.id, role: demoUser.role }
-    : FALLBACK_USER
+  const handleLogout = () => {
+    clearCurrentUser()
+    navigate('/home')
+  }
 
   if (pathname === '/home') return <HomePage />
   if (pathname === '/login') return <LoginPage />
   if (pathname === '/signup') return <SignUpPage />
+
+  if (!user) return null
+
   if (pathname === '/packing') return <PackingUnitPage onBack={handleBack} />
   if (pathname === '/transport')
-    return (
-      <ShipmentPage
-        onBack={handleBack}
-        userId={demoUser?.id ?? null}
-        orgScopeId={orgScope?.id ?? null}
-      />
-    )
+    return <ShipmentPage onBack={handleBack} userId={user.id} orgScopeId={user.orgScopeId} />
 
-  return <LogisticsMainMenu user={displayUser} onNavigate={handleNavigate} />
+  return (
+    <LogisticsMainMenu
+      user={{
+        name: userDisplayName(user),
+        personalNumber: user.personalNumber ?? undefined,
+        role: userRoleLabel(user),
+      }}
+      onNavigate={handleNavigate}
+      onLogout={handleLogout}
+    />
+  )
 }
