@@ -11,10 +11,7 @@ import {
 } from '@prisma/client';
 import type { CurrentUser } from '../auth/current-user.service.js';
 import { assertCanApproveShipment } from '../domain/permissions.js';
-import {
-  assertShipmentTransition,
-  assertShipmentCanVerify,
-} from '../domain/status-transitions.js';
+import { assertShipmentTransition } from '../domain/status-transitions.js';
 import { db } from '../lib/db.js';
 
 @Injectable()
@@ -61,7 +58,6 @@ export class PocService {
 
     assertCanApproveShipment(user.access, shipment.orgScope.orgCode ?? null);
     assertShipmentTransition(shipment.status, ShipmentStatus.verified);
-    assertShipmentCanVerify(shipment.packingUnits.map((pu) => pu.status));
 
     await db.$transaction(
       async (tx) => {
