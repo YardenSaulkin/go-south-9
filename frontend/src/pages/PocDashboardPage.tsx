@@ -24,10 +24,15 @@ const theme = createTheme({
 })
 
 const STATUS_LABEL: Record<string, string> = {
+  // shipment
   not_sent: 'טרם נשלח',
   sent: 'בדרך',
   arrived: 'הגיע — ממתין לאימות',
   verified: 'מאומת',
+  // packing unit / item
+  assigned_to_shipment: 'שויך להובלה',
+  in_transit: 'בדרך',
+  arrived_pending_verification: 'הגיע — ממתין לאימות',
 }
 
 const STATUS_COLOR: Record<string, 'default' | 'warning' | 'success' | 'info'> = {
@@ -35,6 +40,9 @@ const STATUS_COLOR: Record<string, 'default' | 'warning' | 'success' | 'info'> =
   sent: 'info',
   arrived: 'warning',
   verified: 'success',
+  assigned_to_shipment: 'default',
+  in_transit: 'info',
+  arrived_pending_verification: 'warning',
 }
 
 interface Props {
