@@ -72,6 +72,7 @@ export default function App() {
         role: user.role,
       }}
       onNavigate={handleNavigate}
+      onLogout={handleLogout}
     />
   )
 }

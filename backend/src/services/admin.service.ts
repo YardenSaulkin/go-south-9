@@ -36,7 +36,9 @@ export class AdminService {
         personalNumber: u.personalNumber,
         role: u.role,
         orgCode: u.orgCode,
-        orgNames: u.orgCode ? await this.orgHierarchy.resolveOrgCode(u.orgCode) : null,
+        orgNames: u.orgCode
+          ? await this.orgHierarchy.resolveOrgCode(u.orgCode).catch(() => null)
+          : null,
       })),
     );
   }

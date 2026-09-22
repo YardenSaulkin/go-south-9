@@ -191,22 +191,17 @@ export default function LogisticsMainMenu({
               >
                 שלום {user.name}, מה תרצה לעשות?
               </Typography>
-              {roleLabel && (
+              {roleLabel && user.role !== "normal" && (
                 <Chip
                   label={roleLabel}
                   size="small"
                   sx={{
                     fontFamily: "Heebo, sans-serif",
                     fontWeight: 600,
-                    bgcolor:
-                      user.role === "admin"
-                        ? "rgba(211,47,47,0.85)"
-                        : user.role === "poc"
-                          ? "rgba(245,124,0,0.85)"
-                          : "rgba(76,175,80,0.85)",
+                    bgcolor: "rgba(255,255,255,0.25)",
                     color: "white",
                     backdropFilter: "blur(4px)",
-                    border: "1px solid rgba(255,255,255,0.3)",
+                    border: "1px solid rgba(255,255,255,0.4)",
                   }}
                 />
               )}

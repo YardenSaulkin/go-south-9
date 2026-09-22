@@ -2,12 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   Box,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Paper,
   Chip,
   Button,
@@ -37,6 +31,8 @@ const ROLE_COLOR: Record<string, 'error' | 'warning' | 'default'> = {
   poc: 'warning',
   normal: 'default',
 }
+
+
 
 interface Props {
   userId: string | null
@@ -97,75 +93,56 @@ export default function AdminUsersPage({ userId }: Props) {
             <CircularProgress />
           </Box>
         ) : (
-          <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3 }}>
-            <Table>
-              <TableHead>
-                <TableRow sx={{ bgcolor: '#8B5E3C' }}>
-                  {['שם', 'מספר אישי', 'אימייל', 'יחידה', 'תפקיד', 'פעולה'].map((h) => (
-                    <TableCell
-                      key={h}
-                      align="right"
-                      sx={{ color: 'white', fontFamily: 'Heebo, sans-serif', fontWeight: 700 }}
-                    >
-                      {h}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow
-                    key={user.id}
-                    sx={{ '&:nth-of-type(odd)': { bgcolor: 'rgba(139,94,60,0.05)' } }}
+          <Box>
+            {users.map((user) => (
+              <Paper key={user.id} elevation={0} sx={{ borderRadius: 2, p: 2, mb: 1.5 }}>
+                {/* Row 1: name + role chip */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                  <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontWeight: 700, color: '#2d1b0a' }}>
+                    {user.firstName} {user.lastName}
+                  </Typography>
+                  <Chip
+                    label={ROLE_LABEL[user.role] ?? user.role}
+                    color={ROLE_COLOR[user.role] ?? 'default'}
+                    size="small"
+                    sx={{ fontFamily: 'Heebo, sans-serif' }}
+                  />
+                </Box>
+                {/* Row 2: personal number + email */}
+                <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontSize: '0.82rem', color: '#666', mb: 0.5 }}>
+                  {user.personalNumber ?? '—'} · {user.email}
+                </Typography>
+                {/* Row 3: unit */}
+                <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontSize: '0.82rem', color: '#666', mb: user.role !== 'admin' ? 1 : 0 }}>
+                  {user.orgNames?.unit ?? user.orgCode?.substring(0, 2) ?? '—'}
+                </Typography>
+                {/* Row 4: action button */}
+                {user.role !== 'admin' && (
+                  <Button
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    disabled={updating === user.id}
+                    onClick={() => handleRoleToggle(user)}
+                    color={user.role === 'poc' ? 'error' : 'primary'}
+                    sx={
+                      user.role === 'normal'
+                        ? { fontFamily: 'Heebo, sans-serif', borderColor: '#8B5E3C', color: '#8B5E3C' }
+                        : { fontFamily: 'Heebo, sans-serif' }
+                    }
                   >
-                    <TableCell align="right" sx={{ fontFamily: 'Heebo, sans-serif' }}>
-                      {user.firstName} {user.lastName}
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontFamily: 'Heebo, sans-serif', dir: 'ltr' }}>
-                      {user.personalNumber ?? '—'}
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontFamily: 'Heebo, sans-serif', dir: 'ltr' }}>
-                      {user.email}
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontFamily: 'Heebo, sans-serif' }}>
-                      {user.orgNames?.unit ?? user.orgCode?.substring(0, 2) ?? '—'}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Chip
-                        label={ROLE_LABEL[user.role] ?? user.role}
-                        color={ROLE_COLOR[user.role] ?? 'default'}
-                        size="small"
-                        sx={{ fontFamily: 'Heebo, sans-serif' }}
-                      />
-                    </TableCell>
-                    <TableCell align="right">
-                      {user.role !== 'admin' && (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          disabled={updating === user.id}
-                          onClick={() => handleRoleToggle(user)}
-                          sx={{
-                            fontFamily: 'Heebo, sans-serif',
-                            borderColor: '#8B5E3C',
-                            color: '#8B5E3C',
-                          }}
-                        >
-                          {updating === user.id ? (
-                            <CircularProgress size={16} />
-                          ) : user.role === 'poc' ? (
-                            'הסר קצין קישור'
-                          ) : (
-                            'הפוך לקצין קישור'
-                          )}
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                    {updating === user.id ? (
+                      <CircularProgress size={16} />
+                    ) : user.role === 'poc' ? (
+                      'הסר קצין קישור'
+                    ) : (
+                      'הפוך לקצין קישור'
+                    )}
+                  </Button>
+                )}
+              </Paper>
+            ))}
+          </Box>
         )}
       </Box>
     </ThemeProvider>
