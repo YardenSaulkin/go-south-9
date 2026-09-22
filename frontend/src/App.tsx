@@ -60,6 +60,8 @@ export default function App() {
     )
   if (pathname === '/transport')
     return <ShipmentPage onBack={handleBack} userId={user.id} orgScopeId={user.orgScopeId} />
+  if (pathname === '/poc/dashboard') return <PocDashboardPage userId={user.id} onBack={handleBack} />
+  if (pathname === '/admin/users') return <AdminUsersPage userId={user.id} onBack={handleBack} />  
 
   return (
     <LogisticsMainMenu
