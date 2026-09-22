@@ -28,7 +28,7 @@ export class ReceivingService {
     if (orgScopeId) {
       const scope = await db.orgScope.findUnique({ where: { id: orgScopeId } });
       if (!scope) throw new NotFoundException('המסגרת הארגונית לא נמצאה');
-      assertCanAccessMador(user.access, scope.mador);
+      assertCanAccessMador(user.access, scope.mador, scope.orgCode?.trim().slice(0, 2));
     }
 
     const shipments = await db.shipment.findMany({
@@ -64,7 +64,7 @@ export class ReceivingService {
       include: { orgScope: true, packingUnits: true },
     });
     if (!shipment) throw new NotFoundException('ההובלה לא נמצאה');
-    assertCanAccessMador(user.access, shipment.orgScope.mador);
+    assertCanAccessMador(user.access, shipment.orgScope.mador, shipment.orgScope.orgCode?.trim().slice(0, 2));
 
     const summary = summarizeReceiving(
       shipment.packingUnits.map((unit) => unit.id),

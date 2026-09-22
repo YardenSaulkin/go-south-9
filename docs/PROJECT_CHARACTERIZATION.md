@@ -19,14 +19,14 @@ Physical movement creates gaps between expected and actual equipment. Operators 
 
 ## Users and actors
 
-- **super_user:** global creation, visibility, and dashboard.
-- **logistics_user:** creates Shipments/PackingUnits and views data in own mador.
-- **regular_user:** cannot create Shipments; creates PackingUnits and operates in own mador.
+- **admin:** global visibility/dashboard and approval scope, according to the live access-profile view.
+- **poc:** unit-scoped access based on the first two digits of `users.org_code`, with approval capability from the live access profile.
+- **normal:** mador-scoped access through `users.org_scope_id -> org_scopes`, with permissions supplied by the live access profile.
 - **South Operation system:** future upstream source for room/mapping inventory; contract not present.
 
 ## End-to-end workflow
 
-1. User is established through the temporary DB-backed selector.
+1. User signs in or signs up against the DB-backed hackathon auth endpoints.
 2. User chooses אריזה והובלה or קבלה ופיזור.
 3. Packing selects organizational/room context, type, eligible Items, quantity, and destination.
 4. Shipment loading selects ready PackingUnits and transport details, then departs atomically.
@@ -75,7 +75,11 @@ NestJS controllers → Zod DTO validation/current user → application services 
 
 ## Security model
 
-Current demo selection is explicitly temporary and is not strong authentication. Server-side authorization prevents UI-only enforcement. Production requires verified SSO/Supabase Auth claims and an RLS review; neither is falsely claimed complete.
+The current email/personal-number login stores the returned User in local
+storage and forwards its ID in `x-user-id`. This is explicitly temporary and
+is not strong authentication. Server-side authorization still resolves the
+User and access profile for protected operations. Production requires verified
+SSO/Supabase Auth claims and an RLS review; neither is falsely claimed complete.
 
 ## UX architecture
 
@@ -91,7 +95,7 @@ Existing creator/owner/timestamps identify responsibility. The pending audit tab
 
 ## Future extensions
 
-- Replace demo context with SSO/Supabase Auth.
+- Replace the hackathon local-storage/`x-user-id` session with SSO/Supabase Auth.
 - Review and enable RLS policies.
 - Implement the South Operation adapter after receiving its actual API/ERD contract.
 - Add discrepancy resolution workflow and notifications.

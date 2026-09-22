@@ -8,11 +8,27 @@ The existing model below is based on the supplied DB characterization and Prisma
 
 ### `org_scopes`
 
-UUID identity; level (`mador`/`team`); optional unit/anaf/team; required mador; description and timestamps. Parent for Users, Shipments, PackingUnits, and Items.
+UUID identity; level (`mador`/`team`); optional full eight-digit `org_code`;
+optional unit/anaf/team; required mador; description and timestamps. Parent for
+Users, Shipments, PackingUnits, Items, and Destinations. When `org_code` is
+present it is the authoritative hierarchy (`UU AA MM TT`); legacy rows without
+it continue to use their existing textual hierarchy and are explicitly not
+guessed or backfilled by application code.
+
+### `destinations` (pending additive model)
+
+UUID identity plus a unique operator-facing `destination_code`, description,
+building, floor, room, required organizational scope and creator, timestamps,
+and references from PackingUnits. It is the local catalog for the existing/new
+destination Packing flow; the catalog is searched server-side and scoped by the
+authorized organizational scope.
 
 ### `users`
 
-UUID identity, email, role, optional hierarchy fields and scope, optional creator, timestamps. No password. Multiple role-specific owner/creator relations are explicitly named in Prisma.
+UUID identity, email, nullable first/last name, unique nullable personal number,
+role, optional hierarchy fields and scope, optional creator, and timestamps. No
+password is stored. Multiple role-specific owner/creator relations are
+explicitly named in Prisma.
 
 ### `shipments`
 
@@ -20,7 +36,12 @@ Description, lifecycle status, source/destination text and external room identif
 
 ### `packing_units`
 
-Generic packaging entity; optional Shipment; source/destination; scope, owner, creator; lifecycle status; timestamps; many Items.
+Generic packaging entity; optional Shipment; source/destination; optional
+Destination reference; scope, owner, creator; lifecycle status; timestamps; many
+Items. `source_description` is a server-derived snapshot of the selected Room
+description. `destination_description` remains a JSON snapshot of the committed
+Destination details so historical PackingUnits remain understandable if the
+catalog later changes.
 
 ### `items`
 
@@ -33,7 +54,7 @@ Read-only view mapping user role, mador access, creation/view permissions, globa
 ## Existing enums modeled
 
 - `org_scope_level`: `mador`, `team`
-- `user_role`: `super_user`, `logistics_user`, `regular_user`
+- `user_role`: `admin`, `poc`, `normal` (live Supabase enum)
 - `shipment_status`: `not_sent`, `sent`, `arrived`, `verified`
 - `packing_unit_status`: `not_sent`, `assigned_to_shipment`, `in_transit`, `arrived_pending_verification`, `verified`
 - `item_status`: `not_sent`, `assigned_to_packing_unit`, `in_transit`, `arrived_pending_verification`, `verified`
@@ -59,6 +80,11 @@ The unapplied migration at `backend/prisma/migrations/20260922_hackathon_operati
 - `operation_events` for actor/state audit.
 - `discrepancies` for missing Item/PackingUnit quantities without changing movement enums.
 
+The separate pending auth migration
+`backend/prisma/migrations/20260922_auth_identity_fields/migration.sql` adds
+nullable first name, last name, and personal number fields plus a unique index
+for non-null personal numbers.
+
 It must not be applied until existing columns/data/indexes have been inspected and a backup/test plan exists.
 
 ## Transactions
@@ -82,6 +108,12 @@ No API/ERD contract was found in the repository. Existing provenance fields are 
 - `destination_room_id`
 
 Local manual Items may keep these null. External Group/Room/MappingReport data is not duplicated locally.
+
+Until a real Room catalog/API is supplied, a source Room is resolved from the
+existing Item cache by `(org_scope_id, source_room_id)`. Its first available
+`source_description` is treated as the local read-only Room description and is
+snapshotted server-side during packing. A missing cached Room returns `החדר לא קיים`;
+the browser cannot supply or override its description.
 
 For the packing guard, a source room is considered mapped only when at least one
 Item in the scope/room has a non-empty `source_mapping_report_id`. This is a

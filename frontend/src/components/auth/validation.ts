@@ -23,3 +23,16 @@ export function validateRequired(value: string, label: string): string | null {
 export function hasErrors(errors: Record<string, string | null>): boolean {
   return Object.values(errors).some(Boolean)
 }
+
+export function applyIssues<T extends Record<string, string | null>>(
+  errors: T,
+  issues: { path: string; message: string }[],
+  fieldFor: (path: string) => string = (path) => path,
+): T {
+  const next = { ...errors }
+  for (const issue of issues) {
+    const field = fieldFor(issue.path)
+    if (field in next) next[field as keyof T] = issue.message as T[keyof T]
+  }
+  return next
+}

@@ -2,17 +2,25 @@ export interface ContextUser {
   id: string
   email: string
   role: string
+  unit?: string | null
+  anaf?: string | null
   mador: string | null
   team: string | null
   orgScopeId: string | null
+  orgCode?: string | null
 }
 
 export interface OrgScope {
   id: string
+  orgCode?: string | null
   unit: string | null
   anaf: string | null
-  mador: string
+  mador: string | null
   team: string | null
+  unitCode?: string
+  anafCode?: string
+  madorCode?: string
+  teamCode?: string
 }
 
 export interface AppContext {
@@ -23,9 +31,27 @@ export interface AppContext {
 
 export interface SourceRoom {
   roomId: string
+  description: string | null
   exists: boolean
   completed: boolean
   source: string
+}
+
+export interface SourceRoomDetails {
+  id: string
+  description: string | null
+  mappingStatus: RoomMappingStatus
+  roomResponsible: string | null
+  orgCode: string | null
+}
+
+export interface Destination {
+  id: string
+  destinationCode: string
+  description: string
+  building: string
+  floor: string
+  room: string
 }
 
 export interface RoomMappingStatus {
@@ -56,18 +82,16 @@ export interface CreatePackingUnitRequest {
     | 'dolav'
     | 'bulk'
   sourceRoomId: string
-  sourceDescription: string
-  destination: {
-    building: string
-    floor: string
-    room: string
-  }
+  destination:
+    | { mode: 'existing'; destinationId: string }
+    | { mode: 'new'; description: string; building: string; floor: string; room: string }
   items: Array<{ itemId: string; quantity: number }>
 }
 
 export interface PackingSuccessResponse {
   packingUnit: {
     id: string
+    description: string
     serialNumber: number | null
     displaySerial: string | null
     type: CreatePackingUnitRequest['packingUnitType'] | null
@@ -79,13 +103,18 @@ export interface PackingSuccessResponse {
     unit: string | null
     anaf: string | null
     mador: string | null
+    team: string | null
     room: string | null
+    sourceDescription: string | null
+    roomResponsible: string | null
   }
   destination: {
     building: string
     floor: string
     room: string
-    roomId?: string
+    id: string | null
+    code: string
+    description: string
   }
   responsibilities: {
     madorResponsible: string
@@ -105,7 +134,8 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'
+const CONFIGURED_API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
+const API_BASE = `${CONFIGURED_API_URL.replace(/\/api\/?$/, '').replace(/\/$/, '')}/api`
 
 async function request<T>(path: string, options: RequestInit = {}, userId?: string): Promise<T> {
   const headers = new Headers(options.headers)
@@ -143,9 +173,21 @@ export const api = {
       {},
       userId,
     ),
+  getSourceRoom: (userId: string, orgScopeId: string, roomId: string) =>
+    request<SourceRoomDetails>(
+      `/packing-units/source-room?orgScopeId=${encodeURIComponent(orgScopeId)}&roomId=${encodeURIComponent(roomId)}`,
+      {},
+      userId,
+    ),
   getEligibleItems: (userId: string, orgScopeId: string, sourceRoomId: string) =>
     request<EligibleItem[]>(
       `/packing-units/eligible-items?orgScopeId=${encodeURIComponent(orgScopeId)}&sourceRoomId=${encodeURIComponent(sourceRoomId)}`,
+      {},
+      userId,
+    ),
+  searchDestinations: (userId: string, orgScopeId: string, search: string) =>
+    request<Destination[]>(
+      `/destinations?orgScopeId=${encodeURIComponent(orgScopeId)}&search=${encodeURIComponent(search)}`,
       {},
       userId,
     ),

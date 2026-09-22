@@ -23,13 +23,15 @@ import {
 } from './status-transitions.js';
 
 const logisticsAccess = {
-  role: UserRole.logistics_user,
+  role: UserRole.normal,
   accessMador: 'מדור א',
+  accessUnitCode: null,
   canCreateShipments: true,
   canCreatePackingUnits: true,
   canViewShipments: true,
   canViewPackingUnits: true,
   canViewGlobalShipmentsDashboard: false,
+  canApproveShipments: false,
   dataVisibilityScope: 'mador',
 };
 
@@ -39,7 +41,7 @@ describe('operational domain rules', () => {
     expect(canAccessMador(logisticsAccess, 'מדור ב')).toBe(false);
     expect(
       canAccessMador(
-        { ...logisticsAccess, role: UserRole.super_user },
+        { ...logisticsAccess, role: UserRole.admin },
         'מדור ב',
       ),
     ).toBe(true);
@@ -114,8 +116,13 @@ describe('operational domain rules', () => {
       orgScopeId: '123e4567-e89b-12d3-a456-426614174001',
       description: 'קרטון אישי - חדר 1',
       sourceRoomId: 'חדר 1',
-      sourceDescription: '{}',
-      destination: { building: 'א', floor: '1', room: '2' },
+      destination: {
+        mode: 'new' as const,
+        description: 'יעד בדיקה',
+        building: 'א',
+        floor: '1',
+        room: '2',
+      },
     };
 
     expect(

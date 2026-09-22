@@ -30,7 +30,7 @@ export class DistributionService {
     if (orgScopeId) {
       const scope = await db.orgScope.findUnique({ where: { id: orgScopeId } });
       if (!scope) throw new NotFoundException('המסגרת הארגונית לא נמצאה');
-      assertCanAccessMador(user.access, scope.mador);
+      assertCanAccessMador(user.access, scope.mador, scope.orgCode?.trim().slice(0, 2));
     }
 
     const units = await db.packingUnit.findMany({
@@ -62,7 +62,7 @@ export class DistributionService {
       include: { items: true, orgScope: true },
     });
     if (!unit) throw new NotFoundException('יחידת האריזה לא נמצאה');
-    assertCanAccessMador(user.access, unit.orgScope.mador);
+    assertCanAccessMador(user.access, unit.orgScope.mador, unit.orgScope.orgCode?.trim().slice(0, 2));
     if (unit.status !== PackingUnitStatus.arrived_pending_verification) {
       throw new ConflictException('יחידת האריזה אינה ממתינה לפיזור');
     }

@@ -51,6 +51,20 @@ export class PackingController {
     );
   }
 
+  @Get('source-room')
+  async sourceRoom(
+    @Headers('x-user-id') userId: string | undefined,
+    @Query('orgScopeId') orgScopeId: string,
+    @Query('roomId') roomId: string,
+  ) {
+    const user = await this.users.require(userId);
+    return this.packing.getSourceRoomDetails(
+      user,
+      parseOrThrow(uuidSchema, orgScopeId),
+      roomId,
+    );
+  }
+
   @Get('eligible-for-shipment')
   async eligibleForShipment(
     @Headers('x-user-id') userId: string | undefined,

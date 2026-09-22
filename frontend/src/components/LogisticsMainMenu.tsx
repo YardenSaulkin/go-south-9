@@ -6,10 +6,13 @@ import {
   ToggleButton,
   Paper,
   Avatar,
+  Menu,
+  MenuItem,
+  ListItemIcon,
   createTheme,
   ThemeProvider,
 } from '@mui/material'
-import { Package, Truck, PackageOpen, LayoutGrid, type LucideIcon } from 'lucide-react'
+import { Package, Truck, PackageOpen, LayoutGrid, LogOut, type LucideIcon } from 'lucide-react'
 
 interface User {
   name: string
@@ -29,6 +32,7 @@ interface ActionCardItem {
 export interface MainMenuProps {
   user: User
   onNavigate: (route: NavigateRoute) => void
+  onLogout: () => void
 }
 
 const SENDING_CARDS: ActionCardItem[] = [
@@ -57,9 +61,10 @@ function getInitials(name: string): string {
   return name.trim().charAt(0).toUpperCase()
 }
 
-export default function LogisticsMainMenu({ user, onNavigate }: MainMenuProps) {
+export default function LogisticsMainMenu({ user, onNavigate, onLogout }: MainMenuProps) {
   const [activeTab, setActiveTab] = useState<TabValue>('sending')
   const [animKey, setAnimKey] = useState(0)
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null)
 
   const cards = activeTab === 'sending' ? SENDING_CARDS : RECEIVING_CARDS
 
@@ -137,10 +142,14 @@ export default function LogisticsMainMenu({ user, onNavigate }: MainMenuProps) {
               שלום {user.name}, מה תרצה לעשות?
             </Typography>
             <Avatar
+              onClick={(event) => setMenuAnchor(event.currentTarget)}
+              aria-label="תפריט משתמש"
               sx={{
                 width: 40,
                 height: 40,
                 flexShrink: 0,
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
                 bgcolor: 'rgba(139, 94, 60, 0.85)',
                 border: '2px solid rgba(255,255,255,0.55)',
                 fontSize: '1rem',
@@ -153,6 +162,27 @@ export default function LogisticsMainMenu({ user, onNavigate }: MainMenuProps) {
             >
               {getInitials(user.name)}
             </Avatar>
+            <Menu
+              anchorEl={menuAnchor}
+              open={Boolean(menuAnchor)}
+              onClose={() => setMenuAnchor(null)}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+              slotProps={{ paper: { sx: { borderRadius: '14px', minWidth: 160, mt: 0.5 } } }}
+            >
+              <MenuItem
+                onClick={() => {
+                  setMenuAnchor(null)
+                  onLogout()
+                }}
+                sx={{ minHeight: 52, fontWeight: 600, gap: 1, color: '#5a3515' }}
+              >
+                <ListItemIcon sx={{ minWidth: 0, color: 'inherit' }}>
+                  <LogOut size={20} />
+                </ListItemIcon>
+                התנתק
+              </MenuItem>
+            </Menu>
           </Box>
 
           {/* Pill Toggle */}

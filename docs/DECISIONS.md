@@ -60,8 +60,8 @@
 ## AD-010 — Hackathon authentication
 
 - **Question:** How is current user established before SSO exists?
-- **Decision:** Expose a clearly labeled demo selector backed by actual `users` rows. Send `x-user-id` to the backend, resolve it server-side, and load authorization from `user_access_profiles` on every protected request.
-- **Impact:** No invisible hardcoded identity or local password exists. The header is not production authentication and must be replaced by verified SSO/Supabase Auth claims.
+- **Decision:** Use DB-backed email/personal-number login and signup for the hackathon. Persist the returned User locally, send `x-user-id`, resolve it server-side, and load authorization from `user_access_profiles` on every protected request.
+- **Impact:** No hardcoded identity or password exists, but the browser-stored User and spoofable header are not production authentication and must be replaced by verified SSO/Supabase Auth claims.
 
 ## AD-011 — Idempotency and auditability
 
@@ -96,3 +96,27 @@
 - **Question:** What should the success screen show when mador/room responsible-person data is absent?
 - **Decision:** Return the real packer email from the committed `createdBy` relation and display `לא הוגדר` for responsible-person fields because the current data model has no authoritative source for them.
 - **Impact:** No names are fabricated for visual parity.
+
+## AD-017 — Code-backed organizational hierarchy with explicit legacy fallback
+
+- **Decision:** Add nullable `org_scopes.org_code`. A non-null code must be
+  exactly eight digits and is parsed centrally as Unit/Anaf/Mador/Team pairs.
+  Context responses expose those parsed segments so the client does not duplicate
+  parser logic. Rows without a full code remain legacy textual scopes; they are
+  filtered by their existing fields and never inferred from partial values.
+- **Impact:** Code-backed Team selections use the full eight-digit code, avoiding
+  collisions between repeated hierarchy names. Live legacy data must be reviewed
+  before any backfill.
+
+## AD-018 — Room cache and destination catalog snapshots
+
+- **Decision:** Source Rooms are resolved from local Item provenance until an
+  authoritative Room integration is available. The selected Room must exist in
+  the authorized scope and its description is read-only and server-snapshotted.
+  Add a scoped Destination catalog for `existing`/`new` destination selection.
+  Existing destinations are read only; new destinations and their PackingUnit are
+  created in the same serializable transaction. PackingUnits preserve committed
+  source and destination snapshots.
+- **Impact:** Item visibility is room-based rather than owner-based, while scope
+  authorization remains server enforced. The new migration is pending live DB
+  introspection and must not be applied blindly.

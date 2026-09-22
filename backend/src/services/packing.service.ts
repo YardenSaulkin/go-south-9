@@ -3,7 +3,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ItemStatus, PackingUnitStatus, Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
+import {
+  ItemStatus,
+  PackingUnitStatus,
+  Prisma,
+  type Destination,
+  type OrgScope,
+} from '@prisma/client';
 import type { CurrentUser } from '../auth/current-user.service.js';
 import {
   assertCanAccessMador,
@@ -19,18 +26,69 @@ import {
   type RoomMappingStatus,
 } from '../domain/mapping.js';
 import type { CreatePackingUnitInput } from '../domain/operations.schemas.js';
+import type { DestinationSelection } from '../domain/destination.js';
 import { db } from '../lib/db.js';
 
-function serializeDestination(
-  destination: CreatePackingUnitInput['destination'],
-): string {
-  return JSON.stringify(destination);
+type DatabaseClient = Prisma.TransactionClient | typeof db;
+
+export function eligibleItemsWhere(orgScopeId: string, sourceRoomId: string) {
+  return {
+    orgScopeId,
+    sourceRoomId,
+    packingUnitId: null,
+    status: ItemStatus.not_sent,
+    sourceMappingReportId: { not: '' },
+  };
 }
 
-function parseDestination(value: string | null) {
+export interface SourceRoomDetails {
+  id: string;
+  description: string | null;
+  mappingStatus: RoomMappingStatus;
+  roomResponsible: string | null;
+  orgCode: string | null;
+}
+
+export interface DestinationSnapshot {
+  id: string | null;
+  code: string;
+  description: string;
+  building: string;
+  floor: string;
+  room: string;
+}
+
+function serializeDestination(destination: Destination): string {
+  return JSON.stringify({
+    id: destination.id,
+    code: destination.destinationCode,
+    description: destination.description,
+    building: destination.building,
+    floor: destination.floor,
+    room: destination.room,
+  } satisfies DestinationSnapshot);
+}
+
+function parseDestination(value: string | null): DestinationSnapshot | null {
   if (!value) return null;
   try {
-    return JSON.parse(value) as CreatePackingUnitInput['destination'];
+    const parsed = JSON.parse(value) as Partial<DestinationSnapshot>;
+    if (
+      typeof parsed.description !== 'string' ||
+      typeof parsed.building !== 'string' ||
+      typeof parsed.floor !== 'string' ||
+      typeof parsed.room !== 'string'
+    ) {
+      return null;
+    }
+    return {
+      id: typeof parsed.id === 'string' ? parsed.id : null,
+      code: typeof parsed.code === 'string' ? parsed.code : '',
+      description: parsed.description,
+      building: parsed.building,
+      floor: parsed.floor,
+      room: parsed.room,
+    };
   } catch {
     return null;
   }
@@ -41,32 +99,128 @@ export class PackingService {
   private async getScope(user: CurrentUser, orgScopeId: string) {
     const scope = await db.orgScope.findUnique({ where: { id: orgScopeId } });
     if (!scope) throw new NotFoundException('המסגרת הארגונית לא נמצאה');
-    assertCanAccessMador(user.access, scope.mador);
+    assertCanAccessMador(user.access, scope.mador, scope.orgCode?.trim().slice(0, 2));
     return scope;
+  }
+
+  private async resolveSourceRoom(
+    client: DatabaseClient,
+    scope: OrgScope,
+    roomId: string,
+  ): Promise<SourceRoomDetails> {
+    const rows = await client.item.findMany({
+      where: { orgScopeId: scope.id, sourceRoomId: roomId },
+      select: {
+        sourceDescription: true,
+        sourceMappingReportId: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (rows.length === 0) throw new NotFoundException('החדר לא קיים');
+
+    const description = rows.find((row) => row.sourceDescription?.trim())
+      ?.sourceDescription?.trim() ?? null;
+    const mappedItemCount = rows.filter((row) =>
+      Boolean(row.sourceMappingReportId?.trim()),
+    ).length;
+
+    return {
+      id: roomId,
+      description,
+      mappingStatus: mappingStatusFromProvenance(roomId, mappedItemCount),
+      roomResponsible: null,
+      orgCode: scope.orgCode,
+    };
+  }
+
+  private async resolveDestination(
+    client: Prisma.TransactionClient,
+    orgScopeId: string,
+    actorUserId: string,
+    selection: DestinationSelection,
+  ): Promise<Destination> {
+    if (selection.mode === 'existing') {
+      const destination = await client.destination.findUnique({
+        where: { id: selection.destinationId },
+      });
+      if (!destination || destination.orgScopeId !== orgScopeId) {
+        throw new NotFoundException('היעד לא קיים במסגרת הארגונית שנבחרה');
+      }
+      return destination;
+    }
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await client.destination.create({
+          data: {
+            destinationCode: `D-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`,
+            description: selection.description,
+            building: selection.building,
+            floor: selection.floor,
+            room: selection.room,
+            orgScopeId,
+            createdByUserId: actorUserId,
+          },
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002'
+        ) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new ConflictException('לא ניתן להקצות מזהה יעד ייחודי');
   }
 
   async listSourceRooms(user: CurrentUser, orgScopeId: string) {
     const scope = await this.getScope(user, orgScopeId);
     const rows = await db.item.findMany({
       where: { orgScopeId: scope.id, sourceRoomId: { not: null } },
-      select: { sourceRoomId: true, sourceMappingReportId: true },
+      select: {
+        sourceRoomId: true,
+        sourceDescription: true,
+        sourceMappingReportId: true,
+      },
       orderBy: { sourceRoomId: 'asc' },
     });
 
-    const rooms = new Map<string, { roomId: string; mappedItemCount: number }>();
+    const rooms = new Map<string, {
+      roomId: string;
+      description: string | null;
+      mappedItemCount: number;
+    }>();
     for (const row of rows) {
       if (!row.sourceRoomId) continue;
       const current = rooms.get(row.sourceRoomId) ?? {
         roomId: row.sourceRoomId,
+        description: row.sourceDescription?.trim() || null,
         mappedItemCount: 0,
       };
+      if (!current.description && row.sourceDescription?.trim()) {
+        current.description = row.sourceDescription.trim();
+      }
       if (row.sourceMappingReportId?.trim()) current.mappedItemCount += 1;
       rooms.set(row.sourceRoomId, current);
     }
 
-    return [...rooms.values()].map(({ roomId, mappedItemCount }) => ({
+    return [...rooms.values()].map(({ roomId, description, mappedItemCount }) => ({
+      description,
       ...mappingStatusFromProvenance(roomId, mappedItemCount),
     }));
+  }
+
+  async getSourceRoomDetails(
+    user: CurrentUser,
+    orgScopeId: string,
+    sourceRoomId: string,
+  ) {
+    const scope = await this.getScope(user, orgScopeId);
+    return this.resolveSourceRoom(db, scope, sourceRoomId);
   }
 
   async getMappingStatus(
@@ -76,15 +230,7 @@ export class PackingService {
   ): Promise<RoomMappingStatus> {
     const scope = await this.getScope(user, orgScopeId);
     if (!sourceRoomId) return mappingStatusFromProvenance(undefined, 0);
-
-    const mappedItemCount = await db.item.count({
-      where: {
-        orgScopeId: scope.id,
-        sourceRoomId,
-        sourceMappingReportId: { not: '' },
-      },
-    });
-    return mappingStatusFromProvenance(sourceRoomId, mappedItemCount);
+    return (await this.resolveSourceRoom(db, scope, sourceRoomId)).mappingStatus;
   }
 
   async listEligibleItems(
@@ -92,16 +238,12 @@ export class PackingService {
     orgScopeId: string,
     sourceRoomId?: string,
   ) {
-    await this.getScope(user, orgScopeId);
+    const scope = await this.getScope(user, orgScopeId);
+    if (!sourceRoomId) return [];
+    await this.resolveSourceRoom(db, scope, sourceRoomId);
 
     return db.item.findMany({
-      where: {
-        orgScopeId,
-        packingUnitId: null,
-        status: ItemStatus.not_sent,
-        sourceMappingReportId: { not: '' },
-        ...(sourceRoomId ? { sourceRoomId } : {}),
-      },
+      where: eligibleItemsWhere(scope.id, sourceRoomId),
       select: {
         id: true,
         description: true,
@@ -146,9 +288,9 @@ export class PackingService {
       throw new ConflictException('קרטון אישי אינו כולל פריטים');
     }
 
-    const existing = await db.packingUnit.findUnique({
+    const existing = await db.packingUnit.findFirst({
       where: { idempotencyKey: input.idempotencyKey },
-      include: { items: true, createdBy: true, orgScope: true },
+      include: { items: true, createdBy: true, orgScope: true, destination: true },
     });
     if (existing) {
       if (
@@ -169,17 +311,22 @@ export class PackingService {
             where: { id: input.orgScopeId },
           });
           if (!scope) throw new NotFoundException('המסגרת הארגונית לא נמצאה');
-          assertCanCreatePackingUnit(user.access, scope.mador);
+          assertCanCreatePackingUnit(user.access, scope.mador, scope.orgCode?.trim().slice(0, 2));
+
+          const sourceRoom = await this.resolveSourceRoom(
+            tx,
+            scope,
+            input.sourceRoomId,
+          );
+          const destination = await this.resolveDestination(
+            tx,
+            scope.id,
+            user.id,
+            input.destination,
+          );
 
           if (input.packingUnitType !== 'personal_carton') {
-            const mappedItemCount = await tx.item.count({
-              where: {
-                orgScopeId: scope.id,
-                sourceRoomId: input.sourceRoomId,
-                sourceMappingReportId: { not: '' },
-              },
-            });
-            if (mappedItemCount === 0) {
+            if (!sourceRoom.mappingStatus.completed) {
               throw new ConflictException('*יש לסיים את המיפוי');
             }
           }
@@ -190,10 +337,10 @@ export class PackingService {
               status: PackingUnitStatus.not_sent,
               packingUnitType: input.packingUnitType,
               sourceRoomId: input.sourceRoomId,
-              sourceDescription: input.sourceDescription,
-              destinationRoomId:
-                input.destination.roomId ?? input.destination.room,
-              destinationDescription: serializeDestination(input.destination),
+              sourceDescription: sourceRoom.description,
+              destinationId: destination.id,
+              destinationRoomId: destination.destinationCode,
+              destinationDescription: serializeDestination(destination),
               orgScopeId: scope.id,
               ownerUserId: user.id,
               createdByUserId: user.id,
@@ -292,7 +439,7 @@ export class PackingService {
 
           return tx.packingUnit.findUniqueOrThrow({
             where: { id: packingUnit.id },
-            include: { items: true, createdBy: true, orgScope: true },
+            include: { items: true, createdBy: true, orgScope: true, destination: true },
           });
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -304,9 +451,9 @@ export class PackingService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        const duplicate = await db.packingUnit.findUnique({
+        const duplicate = await db.packingUnit.findFirst({
           where: { idempotencyKey: input.idempotencyKey },
-          include: { items: true, createdBy: true, orgScope: true },
+          include: { items: true, createdBy: true, orgScope: true, destination: true },
         });
         if (duplicate) {
           if (
@@ -324,7 +471,7 @@ export class PackingService {
 
   private toSuccessResponse(
     unit: Prisma.PackingUnitGetPayload<{
-      include: { items: true; createdBy: true; orgScope: true };
+      include: { items: true; createdBy: true; orgScope: true; destination: true };
     }>,
     fallbackPacker: string,
   ) {
@@ -332,6 +479,7 @@ export class PackingService {
     return {
       packingUnit: {
         id: unit.id,
+        description: unit.description,
         serialNumber: unit.serialNumber,
         displaySerial: formatSerial(unit.serialNumber),
         type: unit.packingUnitType,
@@ -343,9 +491,14 @@ export class PackingService {
         unit: unit.orgScope.unit,
         anaf: unit.orgScope.anaf,
         mador: unit.orgScope.mador,
+        team: unit.orgScope.team,
         room: unit.sourceRoomId,
+        sourceDescription: unit.sourceDescription,
       },
       destination: destination ?? {
+        id: unit.destinationId,
+        code: unit.destination?.destinationCode ?? unit.destinationRoomId ?? '',
+        description: unit.destination?.description ?? '',
         building: '',
         floor: '',
         room: unit.destinationRoomId ?? '',

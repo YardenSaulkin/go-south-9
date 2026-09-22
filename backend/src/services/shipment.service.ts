@@ -26,7 +26,7 @@ export class ShipmentService {
       throw new ConflictException('אותה יחידת אריזה נבחרה יותר מפעם אחת');
     }
 
-    const existing = await db.shipment.findUnique({
+    const existing = await db.shipment.findFirst({
       where: { idempotencyKey: input.idempotencyKey },
       include: { packingUnits: true },
     });
@@ -39,7 +39,7 @@ export class ShipmentService {
             where: { id: input.orgScopeId },
           });
           if (!scope) throw new NotFoundException('המסגרת הארגונית לא נמצאה');
-          assertCanCreateShipment(user.access, scope.mador);
+          assertCanCreateShipment(user.access, scope.mador, scope.orgCode?.trim().slice(0, 2));
 
           const packingUnits = await tx.packingUnit.findMany({
             where: { id: { in: input.packingUnitIds } },
@@ -142,7 +142,7 @@ export class ShipmentService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        const duplicate = await db.shipment.findUnique({
+        const duplicate = await db.shipment.findFirst({
           where: { idempotencyKey: input.idempotencyKey },
           include: { packingUnits: true },
         });

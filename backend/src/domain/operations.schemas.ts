@@ -1,6 +1,7 @@
 import { PackingUnitType, TransportType } from '@prisma/client';
 import { z } from 'zod';
 import { uuidSchema } from '../common/validation.js';
+import { destinationSelectionSchema } from './destination.js';
 
 export const destinationSchema = z.object({
   building: z.string().trim().min(1, 'יש להזין בניין').max(100),
@@ -16,8 +17,7 @@ export const createPackingUnitSchema = z
     description: z.string().trim().min(2, 'יש להזין תיאור').max(300),
     packingUnitType: z.nativeEnum(PackingUnitType),
     sourceRoomId: z.string().trim().min(1, 'יש לבחור חדר מקור').max(200),
-    sourceDescription: z.string().trim().max(300).optional(),
-    destination: destinationSchema,
+    destination: destinationSelectionSchema,
     items: z
       .array(
         z.object({

@@ -21,12 +21,30 @@ export class CurrentUserService {
         id: true,
         email: true,
         role: true,
-        mador: true,
-        team: true,
+        orgCode: true,
         orgScopeId: true,
+        orgScope: {
+          select: {
+            unit: true,
+            anaf: true,
+            mador: true,
+            team: true,
+            orgCode: true,
+          },
+        },
       },
       orderBy: { email: 'asc' },
-    });
+    }).then((users) => users.map((user) => ({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      mador: user.orgScope?.mador ?? null,
+      team: user.orgScope?.team ?? null,
+      orgScopeId: user.orgScopeId,
+      orgCode: user.orgCode ?? user.orgScope?.orgCode ?? null,
+      unit: user.orgScope?.unit ?? null,
+      anaf: user.orgScope?.anaf ?? null,
+    })));
   }
 
   async require(headerValue: string | undefined): Promise<CurrentUser> {
@@ -36,7 +54,10 @@ export class CurrentUserService {
     }
 
     const [user, access] = await Promise.all([
-      db.user.findUnique({ where: { id: parsedId.data } }),
+      db.user.findUnique({
+        where: { id: parsedId.data },
+        include: { orgScope: true },
+      }),
       db.userAccessProfile.findFirst({ where: { userId: parsedId.data } }),
     ]);
 
@@ -44,13 +65,19 @@ export class CurrentUserService {
       throw new UnauthorizedException('המשתמש אינו קיים או חסר פרופיל הרשאות');
     }
 
+    const accessProfile: AccessProfile = {
+      ...access,
+      accessUnitCode: access.accessUnitCode ?? null,
+      canApproveShipments: Boolean(access.canApproveShipments),
+    };
+
     return {
       id: user.id,
       email: user.email,
-      role: user.role,
+      role: accessProfile.role,
       orgScopeId: user.orgScopeId,
-      mador: user.mador,
-      access,
+      mador: user.orgScope?.mador ?? null,
+      access: accessProfile,
     };
   }
 }

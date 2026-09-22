@@ -3,13 +3,17 @@ import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { CurrentUserService } from './auth/current-user.service.js';
+import { AuthController } from './controllers/auth.controller.js';
 import { ContextController } from './controllers/context.controller.js';
 import { DashboardController } from './controllers/dashboard.controller.js';
+import { DestinationController } from './controllers/destination.controller.js';
 import { DistributionController } from './controllers/distribution.controller.js';
 import { PackingController } from './controllers/packing.controller.js';
 import { ReceivingController } from './controllers/receiving.controller.js';
 import { ShipmentController } from './controllers/shipment.controller.js';
+import { AuthService } from './services/auth.service.js';
 import { DashboardService } from './services/dashboard.service.js';
+import { DestinationService } from './services/destination.service.js';
 import { DistributionService } from './services/distribution.service.js';
 import { PackingService } from './services/packing.service.js';
 import { ReceivingService } from './services/receiving.service.js';
@@ -29,7 +33,9 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
   ],
   controllers: [
     AppController,
+    AuthController,
     ContextController,
+    DestinationController,
     PackingController,
     ShipmentController,
     ReceivingController,
@@ -38,6 +44,8 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
   ],
   providers: [
     AppService,
+    AuthService,
+    DestinationService,
     CurrentUserService,
     PackingService,
     ShipmentService,
