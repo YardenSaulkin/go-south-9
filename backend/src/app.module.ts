@@ -5,6 +5,7 @@ import { AppService } from './app.service.js';
 import { CurrentUserService } from './auth/current-user.service.js';
 import { AdminController } from './controllers/admin.controller.js';
 import { AuthController } from './controllers/auth.controller.js';
+import { PocController } from './controllers/poc.controller.js';
 import { ContextController } from './controllers/context.controller.js';
 import { DashboardController } from './controllers/dashboard.controller.js';
 import { DistributionController } from './controllers/distribution.controller.js';
@@ -12,6 +13,7 @@ import { PackingController } from './controllers/packing.controller.js';
 import { ReceivingController } from './controllers/receiving.controller.js';
 import { ShipmentController } from './controllers/shipment.controller.js';
 import { AdminService } from './services/admin.service.js';
+import { PocService } from './services/poc.service.js';
 import { AuthService } from './services/auth.service.js';
 import { DashboardService } from './services/dashboard.service.js';
 import { OrgHierarchyService } from './services/org-hierarchy.service.js';
@@ -51,6 +53,7 @@ const observeAppSecret = process.env.OBSERVE_APP_SECRET;
     ReceivingController,
     DistributionController,
     DashboardController,
+    PocController,
   ],
   providers: [
     AppService,
@@ -63,6 +66,7 @@ const observeAppSecret = process.env.OBSERVE_APP_SECRET;
     ReceivingService,
     DistributionService,
     DashboardService,
+    PocService,
   ],
 })
 export class AppModule {}
