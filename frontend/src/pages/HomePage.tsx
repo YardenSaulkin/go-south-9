@@ -2,9 +2,10 @@ import { Box, Button } from '@mui/material'
 import { LogIn, UserPlus } from 'lucide-react'
 import AuthScreen from '../components/auth/AuthScreen'
 import { navigate } from '../navigation'
+import BenGurion from '../assets/ben_gurion.svg?react'
 
 const buttonSx = {
-  minHeight: 76,
+  minHeight: 100,
   borderRadius: '18px',
   fontSize: 20,
   fontWeight: 700,
@@ -12,10 +13,20 @@ const buttonSx = {
   boxShadow: '0 4px 18px rgba(0,0,0,0.14)',
 }
 
+const titleSx = {
+  fontFamily: 'Heebo, sans-serif',
+  fontWeight: 700,
+  color: 'white',
+  letterSpacing: 0.3,
+  alignSelf: 'center',
+  fontSize: '30px',
+}
+
 export default function HomePage() {
   return (
     <AuthScreen>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={titleSx}>ברוכים הבאים!</div>
         <Button
           variant="contained"
           fullWidth
@@ -44,6 +55,14 @@ export default function HomePage() {
           <UserPlus size={24} />
           הרשמה
         </Button>
+
+        <BenGurion
+          style={{
+            width: 150,
+            height: 'auto',
+            marginTop: 16,
+          }}
+        />
       </Box>
     </AuthScreen>
   )
