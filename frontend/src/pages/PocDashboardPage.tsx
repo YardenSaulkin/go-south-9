@@ -117,8 +117,7 @@ function ShipmentCard({
           shipment.packingUnits.map((pu) => (
             <Box key={pu.id} sx={{ mb: 0.75, p: 1, borderRadius: 1, bgcolor: 'rgba(0,0,0,0.06)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {/* TODO: remove `true ||` after preview */}
-                {(true || pu.status !== EXPECTED_PU_STATUS[shipment.status]) && (
+                {pu.status !== EXPECTED_PU_STATUS[shipment.status] && (
                   <Chip
                     label={STATUS_LABEL[pu.status] ?? pu.status}
                     color="error"
