@@ -42,7 +42,7 @@ export class DistributionService {
             ? {}
             : { orgScope: { mador: user.access.accessMador ?? '' } }),
       },
-      include: { items: true, shipment: true, orgScope: true },
+      include: { items: true, shipment: true, orgScope: true, createdBy: true },
       orderBy: { serialNumber: 'asc' },
     });
 
