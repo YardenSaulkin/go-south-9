@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import AppLogo from './components/AppLogo'
 import LogisticsMainMenu from './components/LogisticsMainMenu'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
@@ -46,32 +47,41 @@ export default function App() {
     navigate('/home')
   }
 
-  if (pathname === '/home') return <HomePage />
-  if (pathname === '/login') return <LoginPage />
-  if (pathname === '/signup') return <SignUpPage />
-  if (pathname === '/packing') return <PackingUnitPage onBack={handleBack} />
-  if (pathname === '/receiving')
+  const renderRoute = () => {
+    if (pathname === '/home') return <HomePage />
+    if (pathname === '/login') return <LoginPage />
+    if (pathname === '/signup') return <SignUpPage />
+    if (pathname === '/packing') return <PackingUnitPage onBack={handleBack} />
+    if (pathname === '/receiving')
+      return (
+        <ReceivingPage
+          userId={user.id}
+          onExit={handleBack}
+          onNavigate={handleNavigate}
+        />
+      )
+    if (pathname === '/transport')
+      return <ShipmentPage onBack={handleBack} userId={user.id} orgScopeId={user.orgScopeId} />
+    if (pathname === '/poc/dashboard') return <PocDashboardPage userId={user.id} onBack={handleBack} />
+    if (pathname === '/admin/users') return <AdminUsersPage userId={user.id} onBack={handleBack} />
+
     return (
-      <ReceivingPage
-        userId={user.id}
-        onExit={handleBack}
+      <LogisticsMainMenu
+        user={{
+          name: userDisplayName(user),
+          personalNumber: user.personalNumber ?? undefined,
+          role: user.role,
+        }}
         onNavigate={handleNavigate}
+        onLogout={handleLogout}
       />
     )
-  if (pathname === '/transport')
-    return <ShipmentPage onBack={handleBack} userId={user.id} orgScopeId={user.orgScopeId} />
-  if (pathname === '/poc/dashboard') return <PocDashboardPage userId={user.id} onBack={handleBack} />
-  if (pathname === '/admin/users') return <AdminUsersPage userId={user.id} onBack={handleBack} />  
+  }
 
   return (
-    <LogisticsMainMenu
-      user={{
-        name: userDisplayName(user),
-        personalNumber: user.personalNumber ?? undefined,
-        role: user.role,
-      }}
-      onNavigate={handleNavigate}
-      onLogout={handleLogout}
-    />
+    <>
+      <AppLogo />
+      {renderRoute()}
+    </>
   )
 }
