@@ -195,7 +195,7 @@ export default function PocDashboardPage({ userId }: Props) {
             variant="h5"
             sx={{ fontFamily: 'Heebo, sans-serif', fontWeight: 700, color: '#2d1b0a' }}
           >
-            דשבורד קצין קישור
+            {currentUser?.role === 'admin' ? 'דשבורד לוגיסטיקה' : 'דשבורד קצין קישור'}
           </Typography>
         </Box>
 
