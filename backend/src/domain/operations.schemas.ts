@@ -15,7 +15,7 @@ export const createPackingUnitSchema = z
     orgScopeId: uuidSchema,
     description: z.string().trim().min(2, 'יש להזין תיאור').max(300),
     packingUnitType: z.nativeEnum(PackingUnitType),
-    sourceRoomId: z.string().trim().max(200).optional(),
+    sourceRoomId: z.string().trim().min(1, 'יש לבחור חדר מקור').max(200),
     sourceDescription: z.string().trim().max(300).optional(),
     destination: destinationSchema,
     items: z
@@ -28,6 +28,16 @@ export const createPackingUnitSchema = z
       .max(500),
   })
   .superRefine((value, context) => {
+    if (
+      value.packingUnitType === PackingUnitType.personal_carton &&
+      value.items.length > 0
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['items'],
+        message: 'קרטון אישי אינו כולל פריטים',
+      });
+    }
     if (
       value.packingUnitType !== PackingUnitType.personal_carton &&
       value.items.length === 0

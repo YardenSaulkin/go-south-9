@@ -1,621 +1,208 @@
-import { useState, useRef } from 'react'
-import {
-  Box,
-  Typography,
-  IconButton,
-  Checkbox,
-  Menu,
-  MenuItem,
-  Snackbar,
-  createTheme,
-  ThemeProvider,
-} from '@mui/material'
-import { ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { api, type AppContext, type CreatePackingUnitRequest, type EligibleItem, type PackingSuccessResponse, type RoomMappingStatus, type SourceRoom } from '../api'
 
-const theme = createTheme({
-  direction: 'rtl',
-  typography: { fontFamily: 'Heebo, sans-serif' },
-})
-
-interface PackingUnit {
-  id: number
-  name: string
-  count: number
-  expanded: boolean
-  subItems: { id: string; checked: boolean }[]
+export interface PackingDraft {
+  orgScopeId: string
+  unit: string
+  anaf: string
+  mador: string
+  roomId: string
+  building: string
+  floor: string
+  destinationRoom: string
 }
 
-const PACKAGING_TYPES = ['קרטון מקוטע', 'קרטון אחיד', 'פלסטיק', 'זולב', 'תולדות']
-const BRANCHES = ['ענף א׳', 'ענף ב׳', 'ענף ג׳']
-const ROOMS = ['חדר 1', 'חדר 2', 'חדר 3']
-const WAREHOUSES = ['מחסן א׳', 'מחסן ב׳', 'מחסן ג׳']
-const FLOORS = ['קומה 1', 'קומה 2', 'קומה 3']
-const BUILDINGS = ['בניין א׳', 'בניין ב׳', 'בניין ג׳']
-
-const INITIAL_ITEMS: PackingUnit[] = [
-  {
-    id: 1,
-    name: 'מחשב',
-    count: 4,
-    expanded: true,
-    subItems: [
-      { id: 'id-001', checked: false },
-      { id: 'id-002', checked: false },
-    ],
-  },
-  {
-    id: 2,
-    name: 'מסך',
-    count: 8,
-    expanded: false,
-    subItems: [
-      { id: 'id-003', checked: false },
-      { id: 'id-004', checked: false },
-    ],
-  },
+const TYPE_OPTIONS: Array<{ value: CreatePackingUnitRequest['packingUnitType']; label: string }> = [
+  { value: 'professional_carton', label: 'קרטון מקצועי' },
+  { value: 'personal_carton', label: 'קרטון אישי' },
+  { value: 'pallet', label: 'משטח' },
+  { value: 'dolav', label: 'דולב' },
+  { value: 'bulk', label: 'תפזורת' },
 ]
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <Typography
-      sx={{
-        fontFamily: 'Heebo, sans-serif',
-        fontWeight: 700,
-        fontSize: '0.95rem',
-        color: '#3d2008',
-        textAlign: 'right',
-        mb: 1,
-      }}
-    >
-      {children}
-    </Typography>
-  )
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'אירעה שגיאה. נסה שוב.'
 }
 
-interface CustomSelectProps {
-  value: string
-  placeholder: string
-  options: string[]
-  onChange: (val: string) => void
+function unique(values: Array<string | null>) {
+  return [...new Set(values.filter((value): value is string => Boolean(value)))]
 }
 
-function CustomSelect({ value, placeholder, options, onChange }: CustomSelectProps) {
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
-  const open = Boolean(anchorEl)
-
-  return (
-    <>
-      <Box
-        onClick={(e) => setAnchorEl(e.currentTarget)}
-        sx={{
-          backgroundColor: 'rgba(246, 230, 195, 0.85)',
-          border: '1px solid rgba(200, 160, 100, 0.4)',
-          borderRadius: '12px',
-          px: '14px',
-          py: '10px',
-          fontFamily: 'Heebo, sans-serif',
-          fontSize: '0.9rem',
-          color: value ? '#3d2008' : '#b08060',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          userSelect: 'none',
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <ChevronDown size={16} color="#8B5E3C" style={{ flexShrink: 0 }} />
-        <span style={{ textAlign: 'right', flex: 1 }}>{value || placeholder}</span>
-      </Box>
-      <Menu
-        anchorEl={anchorEl}
-        open={open}
-        onClose={() => setAnchorEl(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        slotProps={{
-          paper: {
-            sx: {
-              mt: '4px',
-              borderRadius: '12px',
-              backgroundColor: 'rgba(246, 230, 195, 0.97)',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-              border: '1px solid rgba(200, 160, 100, 0.4)',
-              minWidth: 140,
-              overflow: 'hidden',
-            },
-          },
-        }}
-      >
-        {options.map((opt) => (
-          <MenuItem
-            key={opt}
-            onClick={() => {
-              onChange(opt)
-              setAnchorEl(null)
-            }}
-            selected={opt === value}
-            sx={{
-              fontFamily: 'Heebo, sans-serif',
-              fontSize: '0.9rem',
-              color: '#3d2008',
-              justifyContent: 'flex-end',
-              direction: 'rtl',
-              py: '10px',
-              px: '16px',
-              '&.Mui-selected': {
-                backgroundColor: 'rgba(139, 94, 60, 0.15)',
-                fontWeight: 700,
-              },
-              '&:hover': { backgroundColor: 'rgba(139, 94, 60, 0.1)' },
-            }}
-          >
-            {opt}
-          </MenuItem>
-        ))}
-      </Menu>
-    </>
-  )
+function GroupCheckbox({ checked, indeterminate, onChange }: { checked: boolean; indeterminate: boolean; onChange: (checked: boolean) => void }) {
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate
+  }, [indeterminate])
+  return <input ref={ref} type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} aria-label="בחירת כל הפריטים בקבוצה" />
 }
 
-export interface PackingUnitPageProps {
-  onBack: () => void
+function ScopeSelect({ label, value, options, disabled, onChange }: { label: string; value: string; options: string[]; disabled?: boolean; onChange: (value: string) => void }) {
+  return <label className="packing-field"><span>{label}</span><select value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}><option value="">בחר {label}</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
 }
 
-export default function PackingUnitPage({ onBack }: PackingUnitPageProps) {
-  const [packagingType, setPackagingType] = useState('קרטון מקוטע')
-  const [items, setItems] = useState<PackingUnit[]>(INITIAL_ITEMS)
-  const [sourceText, setSourceText] = useState('')
-  const [branch, setBranch] = useState('')
-  const [room, setRoom] = useState('')
-  const [warehouse, setWarehouse] = useState('')
-  const [destText, setDestText] = useState('')
-  const [floor, setFloor] = useState('')
-  const [building, setBuilding] = useState('')
-  const [toastOpen, setToastOpen] = useState(false)
+export default function PackingUnitPage({ onBack, initialDraft, onComplete }: { onBack: () => void; initialDraft?: PackingDraft | null; onComplete: (response: PackingSuccessResponse, draft: PackingDraft) => void }) {
+  const [context, setContext] = useState<AppContext | null>(null)
+  const [contextError, setContextError] = useState('')
+  const [source, setSource] = useState<PackingDraft>({
+    orgScopeId: initialDraft?.orgScopeId ?? '',
+    unit: initialDraft?.unit ?? '',
+    anaf: initialDraft?.anaf ?? '',
+    mador: initialDraft?.mador ?? '',
+    roomId: initialDraft?.roomId ?? '',
+    building: initialDraft?.building ?? '',
+    floor: initialDraft?.floor ?? '',
+    destinationRoom: initialDraft?.destinationRoom ?? '',
+  })
+  const [rooms, setRooms] = useState<SourceRoom[]>([])
+  const [items, setItems] = useState<EligibleItem[]>([])
+  const [selected, setSelected] = useState<Record<string, number>>({})
+  const [packingType, setPackingType] = useState<CreatePackingUnitRequest['packingUnitType'] | ''>('')
+  const [mapping, setMapping] = useState<RoomMappingStatus | null>(null)
+  const [mappingLoading, setMappingLoading] = useState(false)
+  const [mappingError, setMappingError] = useState('')
+  const [itemsLoading, setItemsLoading] = useState(false)
+  const [roomsLoading, setRoomsLoading] = useState(false)
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [error, setError] = useState('')
+  const requestVersion = useRef(0)
 
-  const anyItemChecked = items.some((item) => item.subItems.some((s) => s.checked))
-  const allFilled = branch && room && warehouse && floor && building && anyItemChecked
+  useEffect(() => {
+    let active = true
+    api.getContext().then((value) => { if (active) setContext(value) }).catch((reason: unknown) => { if (active) setContextError(errorMessage(reason)) })
+    return () => { active = false }
+  }, [])
 
-  const toggleItem = (id: number) => {
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, expanded: !item.expanded } : item))
-    )
-  }
+  const userId = context?.users[0]?.id ?? ''
+  const scopes = context?.scopes ?? []
+  const unitOptions = unique(scopes.map((scope) => scope.unit))
+  const anafOptions = unique(scopes.filter((scope) => scope.unit === source.unit).map((scope) => scope.anaf))
+  const madorOptions = unique(scopes.filter((scope) => scope.unit === source.unit && scope.anaf === source.anaf).map((scope) => scope.mador))
+  const selectedScope = scopes.find((scope) => scope.id === source.orgScopeId)
+  const isPersonal = packingType === 'personal_carton'
+  const groupedItems = useMemo(() => {
+    const groups = new Map<string, EligibleItem[]>()
+    for (const item of items) groups.set(item.description, [...(groups.get(item.description) ?? []), item])
+    return [...groups.entries()]
+  }, [items])
 
-  const toggleSubItem = (itemId: number, subId: string) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              subItems: item.subItems.map((s) =>
-                s.id === subId ? { ...s, checked: !s.checked } : s
-              ),
-            }
-          : item
-      )
-    )
-  }
-
-  const toggleAllSubItems = (itemId: number, checkAll: boolean) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId
-          ? { ...item, subItems: item.subItems.map((s) => ({ ...s, checked: checkAll })) }
-          : item
-      )
-    )
-  }
-
-  const handleFinish = () => {
-    if (!allFilled) {
-      setToastOpen(true)
+  useEffect(() => {
+    if (!userId || !source.orgScopeId) {
+      return
     }
+    let active = true
+    setRoomsLoading(true)
+    api.getSourceRooms(userId, source.orgScopeId).then((value) => { if (active) setRooms(value) }).catch((reason: unknown) => { if (active) setError(errorMessage(reason)) }).finally(() => { if (active) setRoomsLoading(false) })
+    return () => { active = false }
+  }, [source.orgScopeId, userId])
+
+  useEffect(() => {
+    const version = ++requestVersion.current
+    if (!userId || !source.orgScopeId || !source.roomId) return
+    setMappingLoading(true)
+    setItemsLoading(true)
+    Promise.all([api.getMappingStatus(userId, source.orgScopeId, source.roomId), api.getEligibleItems(userId, source.orgScopeId, source.roomId)]).then(([mappingResult, itemsResult]) => {
+      if (version !== requestVersion.current) return
+      setMapping(mappingResult)
+      setItems(itemsResult)
+    }).catch((reason: unknown) => {
+      if (version !== requestVersion.current) return
+      setMappingError(errorMessage(reason))
+      setError(errorMessage(reason))
+    }).finally(() => {
+      if (version === requestVersion.current) {
+        setMappingLoading(false)
+        setItemsLoading(false)
+      }
+    })
+  }, [source.orgScopeId, source.roomId, userId])
+
+  const clearOperationalSelection = () => {
+    setSelected({})
+    setItems([])
+    setMapping(null)
+    setMappingError('')
+    setError('')
   }
 
-  const sectionCardSx = {
-    backgroundColor: 'rgba(240, 210, 155, 0.65)',
-    backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
-    borderRadius: '18px',
-    p: 2,
-    border: '1px solid rgba(255,255,255,0.25)',
-    boxShadow: '0 4px 18px rgba(0,0,0,0.1)',
+  const selectUnit = (unit: string) => { clearOperationalSelection(); setSource((value) => ({ ...value, unit, anaf: '', mador: '', orgScopeId: '', roomId: '' })) }
+  const selectAnaf = (anaf: string) => { clearOperationalSelection(); setSource((value) => ({ ...value, anaf, mador: '', orgScopeId: '', roomId: '' })) }
+  const selectMador = (mador: string) => {
+    clearOperationalSelection()
+    const scope = scopes.find((value) => value.unit === source.unit && value.anaf === source.anaf && value.mador === mador)
+    setSource((value) => ({ ...value, mador, orgScopeId: scope?.id ?? '', roomId: '' }))
+  }
+  const selectRoom = (roomId: string) => { clearOperationalSelection(); setSource((value) => ({ ...value, roomId })) }
+  const toggleType = (value: CreatePackingUnitRequest['packingUnitType']) => { setPackingType(value); setError(''); if (value === 'personal_carton') setSelected({}) }
+
+  const toggleItem = (item: EligibleItem, checked: boolean) => {
+    setSelected((value) => {
+      const next = { ...value }
+      if (checked) next[item.id] = value[item.id] ?? item.quantity
+      else delete next[item.id]
+      return next
+    })
   }
 
-  const inputSx = {
-    backgroundColor: 'rgba(246, 230, 195, 0.85)',
-    border: '1px solid rgba(200, 160, 100, 0.4)',
-    borderRadius: '12px',
-    padding: '10px 14px',
-    fontFamily: 'Heebo, sans-serif',
-    fontSize: '0.9rem',
-    color: '#3d2008',
-    outline: 'none',
-    width: '100%',
-    direction: 'rtl' as const,
+  const toggleGroup = (group: EligibleItem[], checked: boolean) => {
+    setSelected((value) => {
+      const next = { ...value }
+      for (const item of group) {
+        if (checked) next[item.id] = value[item.id] ?? item.quantity
+        else delete next[item.id]
+      }
+      return next
+    })
   }
 
-  return (
-    <ThemeProvider theme={theme}>
-      <Box
-        dir="rtl"
-        sx={{
-          width: '100vw',
-          height: '100dvh',
-          position: 'relative',
-          backgroundImage: 'url(/desert-bg.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center top',
-          backgroundRepeat: 'no-repeat',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Overlay */}
-        <Box
-          sx={{
-            position: 'absolute',
-            inset: 0,
-            background:
-              'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 25%, transparent 50%)',
-            pointerEvents: 'none',
-            zIndex: 0,
-          }}
-        />
+  const updateQuantity = (item: EligibleItem, event: ChangeEvent<HTMLInputElement>) => {
+    const quantity = Number(event.target.value)
+    setSelected((value) => ({ ...value, [item.id]: Number.isFinite(quantity) ? Math.min(item.quantity, Math.max(1, quantity)) : 1 }))
+  }
 
-        {/* Header */}
-        <Box
-          sx={{
-            position: 'relative',
-            zIndex: 2,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pt: '5vh',
-            pb: '1.5vh',
-            px: '5vw',
-            flexShrink: 0,
-          }}
-        >
-          <IconButton
-            onClick={onBack}
-            sx={{ position: 'absolute', right: '4vw', color: 'white', p: 0.5 }}
-          >
-            <ChevronRight size={28} strokeWidth={2.5} />
-          </IconButton>
-          <Typography
-            sx={{
-              fontFamily: 'Heebo, sans-serif',
-              fontWeight: 800,
-              fontSize: '1.6rem',
-              color: 'white',
-              textShadow: '0 2px 8px rgba(0,0,0,0.45)',
-              letterSpacing: 0.5,
-            }}
-          >
-            יחידת אריזה
-          </Typography>
-        </Box>
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setError('')
+    if (!userId || !selectedScope || !source.roomId || !packingType || !source.building || !source.floor || !source.destinationRoom) {
+      setError('יש להשלים את מקור האריזה, סוג האריזה והיעד.')
+      return
+    }
+    if (!isPersonal && mappingError) { setError('לא ניתן לבדוק את המיפוי. נסה שוב.'); return }
+    if (!isPersonal && (!mapping || !mapping.completed)) { setError('יש לסיים את המיפוי לפני אריזה שאינה אישית.'); return }
+    const selectedItems = Object.entries(selected).map(([itemId, quantity]) => ({ itemId, quantity }))
+    if (!isPersonal && selectedItems.length === 0) { setError('יש לבחור לפחות פריט אחד לאריזה'); return }
+    const draft = { ...source }
+    setSubmitLoading(true)
+    try {
+      const response = await api.createPackingUnit(userId, {
+        idempotencyKey: crypto.randomUUID(),
+        orgScopeId: selectedScope.id,
+        description: `${TYPE_OPTIONS.find((option) => option.value === packingType)?.label ?? 'יחידת אריזה'} - ${source.roomId}`,
+        packingUnitType: packingType,
+        sourceRoomId: source.roomId,
+        sourceDescription: JSON.stringify({ unit: source.unit, anaf: source.anaf, mador: source.mador, room: source.roomId }),
+        destination: { building: source.building, floor: source.floor, room: source.destinationRoom },
+        items: isPersonal ? [] : selectedItems,
+      })
+      onComplete(response, draft)
+    } catch (reason: unknown) { setError(errorMessage(reason)) } finally { setSubmitLoading(false) }
+  }
 
-        {/* Scrollable form */}
-        <Box
-          sx={{
-            position: 'relative',
-            zIndex: 1,
-            flex: 1,
-            overflowY: 'auto',
-            px: '5vw',
-            pt: 1,
-            pb: 2,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 2,
-            '&::-webkit-scrollbar': { display: 'none' },
-            scrollbarWidth: 'none',
-          }}
-        >
-          {/* מאיפה אורזים */}
-          <Box sx={sectionCardSx}>
-            <SectionLabel>מאיפה אורזים?</SectionLabel>
-            <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
-              <Box sx={{ flex: 1 }}>
-                <Box
-                  component="input"
-                  value={sourceText}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setSourceText(e.target.value)
-                  }
-                  placeholder="ו"
-                  sx={inputSx}
-                />
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <CustomSelect
-                  value={branch}
-                  placeholder="בחר ענף"
-                  options={BRANCHES}
-                  onChange={setBranch}
-                />
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Box sx={{ flex: 1 }}>
-                <CustomSelect
-                  value={warehouse}
-                  placeholder="בחר מחסן"
-                  options={WAREHOUSES}
-                  onChange={setWarehouse}
-                />
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <CustomSelect
-                  value={room}
-                  placeholder="בחר מחדר"
-                  options={ROOMS}
-                  onChange={setRoom}
-                />
-              </Box>
-            </Box>
-          </Box>
+  if (contextError) return <main className="packing-shell"><p className="packing-error" role="alert">{contextError}</p><button className="packing-secondary-button" onClick={onBack}>חזרה</button></main>
+  if (!context) return <main className="packing-shell"><p className="packing-loading" role="status">טוען נתוני אריזה…</p></main>
 
-          {/* בחר סוג אריזה */}
-          <Box sx={sectionCardSx}>
-            <SectionLabel>בחר סוג אריזה</SectionLabel>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {PACKAGING_TYPES.map((type) => {
-                const selected = packagingType === type
-                return (
-                  <Box
-                    key={type}
-                    onClick={() => setPackagingType(type)}
-                    sx={{
-                      px: 2,
-                      py: '6px',
-                      borderRadius: '999px',
-                      backgroundColor: selected ? '#8B5E3C' : 'rgba(246, 230, 195, 0.85)',
-                      color: selected ? 'white' : '#6e4e37',
-                      fontFamily: 'Heebo, sans-serif',
-                      fontWeight: selected ? 700 : 500,
-                      fontSize: '0.85rem',
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                      border: selected
-                        ? '1px solid rgba(255,255,255,0.2)'
-                        : '1px solid rgba(200, 160, 100, 0.4)',
-                      boxShadow: selected ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
-                      transition: 'all 0.15s ease',
-                      WebkitTapHighlightColor: 'transparent',
-                    }}
-                  >
-                    {type}
-                  </Box>
-                )
-              })}
-            </Box>
-          </Box>
+  return <main className="packing-shell" dir="rtl">
+    <header className="packing-header"><button className="packing-back" type="button" onClick={onBack} aria-label="חזרה">‹</button><h1>יחידת אריזה</h1><span aria-hidden="true" /></header>
+    <form className="packing-form" onSubmit={handleSubmit}>
+      <section className="packing-card" aria-labelledby="source-title"><h2 id="source-title">מאיפה אורזים?</h2><div className="packing-grid four-columns"><ScopeSelect label="יחידה" value={source.unit} options={unitOptions} onChange={selectUnit} /><ScopeSelect label="ענף" value={source.anaf} options={anafOptions} disabled={!source.unit} onChange={selectAnaf} /><ScopeSelect label="מדור" value={source.mador} options={madorOptions} disabled={!source.anaf} onChange={selectMador} /><label className="packing-field"><span>חדר</span><input list="source-rooms" value={source.roomId} disabled={!source.orgScopeId} placeholder={roomsLoading ? 'טוען חדרים…' : 'בחר או הזן חדר'} onChange={(event) => selectRoom(event.target.value)} /><datalist id="source-rooms">{rooms.map((room) => <option key={room.roomId} value={room.roomId} />)}</datalist></label></div>{mappingLoading && <p className="packing-loading" role="status">בודק את מצב המיפוי…</p>}{!mappingLoading && mapping && !mapping.completed && <p className="packing-warning" role="alert">*יש לסיים את המיפוי{isPersonal && <span> · קרטון אישי ניתן ליצור ללא מיפוי</span>}</p>}{mappingError && <p className="packing-error" role="alert">שגיאה בבדיקת המיפוי: {mappingError}</p>}</section>
+      <section className="packing-card" aria-labelledby="type-title"><h2 id="type-title">בחר סוג אריזה</h2><div className="packing-type-list" role="radiogroup" aria-labelledby="type-title">{TYPE_OPTIONS.map((option) => <button key={option.value} className={`packing-type ${packingType === option.value ? 'selected' : ''}`} type="button" role="radio" aria-checked={packingType === option.value} onClick={() => toggleType(option.value)}>{option.label}</button>)}</div>{isPersonal && <p className="packing-hint">קרטון אישי אינו דורש בחירת פריטים.</p>}</section>
+      {!isPersonal && <section className="packing-card" aria-labelledby="items-title"><div className="packing-section-heading"><h2 id="items-title">בחר פריטים לארוז</h2><span>{itemsLoading ? 'טוען…' : `${Object.keys(selected).length} נבחרו`}</span></div>{!source.roomId && <p className="packing-hint">בחר חדר מקור כדי לטעון פריטים זמינים.</p>}{!itemsLoading && source.roomId && items.length === 0 && <p className="packing-hint">אין פריטים זמינים בחדר שנבחר.</p>}<div className="packing-groups">{groupedItems.map(([groupName, group]) => { const selectedCount = group.filter((item) => item.id in selected).length; return <div className="packing-group" key={groupName}><div className="packing-group-header"><label><GroupCheckbox checked={selectedCount === group.length} indeterminate={selectedCount > 0 && selectedCount < group.length} onChange={(checked) => toggleGroup(group, checked)} /> <strong>{groupName}</strong></label><span>כמות: {group.reduce((sum, item) => sum + item.quantity, 0)}</span></div>{group.map((item) => <div className="packing-item" key={item.id}><label><input type="checkbox" checked={item.id in selected} onChange={(event) => toggleItem(item, event.target.checked)} /><span>{item.description}<small> מזהה: {item.id}</small></span></label>{item.id in selected && <label className="quantity-field"><span>כמות</span><input type="number" min="1" max={item.quantity} value={selected[item.id]} onChange={(event) => updateQuantity(item, event)} /><small>מתוך {item.quantity}</small></label>}</div>)}</div> })}</div></section>}
+      <section className="packing-card" aria-labelledby="destination-title"><h2 id="destination-title">לאן שולחים?</h2><div className="packing-grid destination-grid"><label className="packing-field"><span>בניין</span><input value={source.building} onChange={(event) => setSource((value) => ({ ...value, building: event.target.value }))} /></label><label className="packing-field"><span>קומה</span><input value={source.floor} onChange={(event) => setSource((value) => ({ ...value, floor: event.target.value }))} /></label><label className="packing-field"><span>חדר יעד</span><input value={source.destinationRoom} onChange={(event) => setSource((value) => ({ ...value, destinationRoom: event.target.value }))} /></label></div></section>
+      {error && <p className="packing-error packing-form-error" role="alert">{error}</p>}<button className="packing-submit" type="submit" disabled={submitLoading || mappingLoading}>{submitLoading ? 'שומר יחידת אריזה…' : 'סיום אריזה'}</button>
+    </form>
+  </main>
+}
 
-          {/* בחר פריטים לארוז */}
-          <Box sx={sectionCardSx}>
-            <SectionLabel>בחר פריטים לארוז</SectionLabel>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {items.map((item) => (
-                <Box key={item.id}>
-                  <Box
-                    onClick={() => toggleItem(item.id)}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      backgroundColor: 'rgba(246, 230, 195, 0.85)',
-                      borderRadius: item.expanded ? '12px 12px 0 0' : '12px',
-                      px: 1.5,
-                      py: 1,
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                      WebkitTapHighlightColor: 'transparent',
-                      border: '1px solid rgba(200, 160, 100, 0.3)',
-                      borderBottom: item.expanded
-                        ? '1px solid rgba(200, 160, 100, 0.15)'
-                        : '1px solid rgba(200, 160, 100, 0.3)',
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      {item.expanded ? (
-                        <ChevronUp size={18} color="#8B5E3C" />
-                      ) : (
-                        <ChevronDown size={18} color="#8B5E3C" />
-                      )}
-                      <Typography
-                        sx={{
-                          fontFamily: 'Heebo, sans-serif',
-                          fontSize: '0.85rem',
-                          color: '#6e4e37',
-                          fontWeight: 500,
-                        }}
-                      >
-                        כמות: {item.count}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography
-                        sx={{
-                          fontFamily: 'Heebo, sans-serif',
-                          fontSize: '0.9rem',
-                          fontWeight: 700,
-                          color: '#3d2008',
-                        }}
-                      >
-                        {item.name}
-                      </Typography>
-                      <Checkbox
-                        size="small"
-                        checked={item.subItems.every((s) => s.checked)}
-                        indeterminate={
-                          item.subItems.some((s) => s.checked) &&
-                          !item.subItems.every((s) => s.checked)
-                        }
-                        onChange={(e) => {
-                          e.stopPropagation()
-                          toggleAllSubItems(item.id, e.target.checked)
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        sx={{
-                          p: 0,
-                          color: '#8B5E3C',
-                          '&.Mui-checked': { color: '#8B5E3C' },
-                          '&.MuiCheckbox-indeterminate': { color: '#8B5E3C' },
-                        }}
-                      />
-                    </Box>
-                  </Box>
-
-                  {item.expanded && (
-                    <Box
-                      sx={{
-                        backgroundColor: 'rgba(250, 238, 210, 0.75)',
-                        borderRadius: '0 0 12px 12px',
-                        border: '1px solid rgba(200, 160, 100, 0.3)',
-                        borderTop: 'none',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {item.subItems.map((sub, sIdx) => (
-                        <Box
-                          key={sub.id}
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            px: 1.5,
-                            py: '8px',
-                            borderBottom:
-                              sIdx < item.subItems.length - 1
-                                ? '1px solid rgba(200, 160, 100, 0.2)'
-                                : 'none',
-                          }}
-                        >
-                          <Checkbox
-                            size="small"
-                            checked={sub.checked}
-                            onChange={() => toggleSubItem(item.id, sub.id)}
-                            sx={{ p: 0, color: '#8B5E3C', '&.Mui-checked': { color: '#8B5E3C' } }}
-                          />
-                          <Typography
-                            sx={{
-                              fontFamily: 'Heebo, sans-serif',
-                              fontSize: '0.85rem',
-                              color: '#6e4e37',
-                            }}
-                          >
-                            {item.name} ={sub.id}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  )}
-                </Box>
-              ))}
-            </Box>
-          </Box>
-
-          {/* לאן שולחים */}
-          <Box sx={sectionCardSx}>
-            <SectionLabel>לאן שולחים?</SectionLabel>
-            <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
-              <Box sx={{ flex: 1 }}>
-                <Box
-                  component="input"
-                  value={destText}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setDestText(e.target.value)
-                  }
-                  placeholder="ו"
-                  sx={inputSx}
-                />
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <CustomSelect
-                  value={floor}
-                  placeholder="בחר קומה"
-                  options={FLOORS}
-                  onChange={setFloor}
-                />
-              </Box>
-            </Box>
-            <CustomSelect
-              value={building}
-              placeholder="בחר בניין"
-              options={BUILDINGS}
-              onChange={setBuilding}
-            />
-          </Box>
-        </Box>
-
-        {/* Fixed bottom button */}
-        <Box
-          sx={{
-            position: 'relative',
-            zIndex: 2,
-            flexShrink: 0,
-            px: '5vw',
-            pt: 1.5,
-            pb: 'max(env(safe-area-inset-bottom), 20px)',
-            backgroundColor: 'transparent',
-          }}
-        >
-          <Box
-            onClick={handleFinish}
-            sx={{
-              width: '100%',
-              py: '14px',
-              borderRadius: '999px',
-              backgroundColor: allFilled ? '#8B5E3C' : 'rgba(139, 94, 60, 0.4)',
-              color: allFilled ? 'white' : 'rgba(255,255,255,0.6)',
-              fontFamily: 'Heebo, sans-serif',
-              fontWeight: 700,
-              fontSize: '1.05rem',
-              textAlign: 'center',
-              cursor: allFilled ? 'pointer' : 'default',
-              boxShadow: allFilled ? '0 4px 16px rgba(0,0,0,0.25)' : 'none',
-              letterSpacing: 0.5,
-              WebkitTapHighlightColor: 'transparent',
-              userSelect: 'none',
-              transition: 'all 0.2s ease',
-              ...(allFilled && {
-                '&:active': {
-                  transform: 'scale(0.97)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                },
-              }),
-            }}
-          >
-            סיים אריזה
-          </Box>
-        </Box>
-
-        {/* Toast */}
-        <Snackbar
-          open={toastOpen}
-          autoHideDuration={2500}
-          onClose={() => setToastOpen(false)}
-          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-          message="לא כל השדות הנדרשים מולאו"
-          slotProps={{
-            content: {
-              sx: {
-                backgroundColor: '#5a3010',
-                fontFamily: 'Heebo, sans-serif',
-                fontSize: '0.9rem',
-                borderRadius: '12px',
-                direction: 'rtl',
-              },
-            },
-          }}
-        />
-      </Box>
-    </ThemeProvider>
-  )
+export function PackingSuccessScreen({ response, onContinue, onHome }: { response: PackingSuccessResponse; onContinue: () => void; onHome: () => void }) {
+  const typeLabel = TYPE_OPTIONS.find((option) => option.value === response.packingUnit.type)?.label ?? 'יחידת אריזה'
+  return <main className="packing-shell success-shell" dir="rtl"><section className="success-card" aria-labelledby="success-title" tabIndex={-1}><p className="success-eyebrow">{typeLabel}</p><h1 id="success-title">יחידת אריזה הושלמה!</h1><div className="success-serial"><span>מס׳ אריזה</span><strong>{response.packingUnit.displaySerial ?? 'לא הוגדר'}</strong></div><div className="success-grid"><div><span>נשלח מ:</span><strong>{[response.source.unit, response.source.anaf, response.source.mador, response.source.room].filter(Boolean).join(' · ') || 'לא הוגדר'}</strong></div><div><span>נשלח אל:</span><strong>{[response.destination.building, response.destination.floor, response.destination.room].filter(Boolean).join(' · ') || 'לא הוגדר'}</strong></div><div><span>אחראי מדור:</span><strong>{response.responsibilities.madorResponsible}</strong></div><div><span>אחראי חדר:</span><strong>{response.responsibilities.roomResponsible}</strong></div><div><span>אורז:</span><strong>{response.responsibilities.packer}</strong></div><div><span>פריטים:</span><strong>{response.packingUnit.itemCount}</strong></div></div><div className="success-actions"><p>האם להמשיך באריזה?</p><div><button className="packing-submit" type="button" onClick={onContinue}>כן</button><button className="packing-secondary-button" type="button" onClick={onHome}>לא</button></div></div></section></main>
 }

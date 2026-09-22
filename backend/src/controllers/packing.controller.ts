@@ -25,6 +25,32 @@ export class PackingController {
     );
   }
 
+  @Get('source-rooms')
+  async sourceRooms(
+    @Headers('x-user-id') userId: string | undefined,
+    @Query('orgScopeId') orgScopeId: string,
+  ) {
+    const user = await this.users.require(userId);
+    return this.packing.listSourceRooms(
+      user,
+      parseOrThrow(uuidSchema, orgScopeId),
+    );
+  }
+
+  @Get('mapping-status')
+  async mappingStatus(
+    @Headers('x-user-id') userId: string | undefined,
+    @Query('orgScopeId') orgScopeId: string,
+    @Query('sourceRoomId') sourceRoomId?: string,
+  ) {
+    const user = await this.users.require(userId);
+    return this.packing.getMappingStatus(
+      user,
+      parseOrThrow(uuidSchema, orgScopeId),
+      sourceRoomId,
+    );
+  }
+
   @Get('eligible-for-shipment')
   async eligibleForShipment(
     @Headers('x-user-id') userId: string | undefined,
