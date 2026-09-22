@@ -25,7 +25,7 @@ const titleSx = {
 export default function HomePage() {
   return (
     <AuthScreen>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
         <div style={titleSx}>ברוכים הבאים!</div>
         <Button
           variant="contained"
@@ -37,6 +37,7 @@ export default function HomePage() {
           <LogIn size={24} />
           התחברות
         </Button>
+        
         <Button
           variant="contained"
           fullWidth

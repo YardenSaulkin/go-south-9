@@ -2,7 +2,10 @@ import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { TextField, type TextFieldProps } from '@mui/material'
 import AuthLayout from '../components/auth/AuthLayout'
 import { navigate } from '../navigation'
+import { signup, type SignupPayload } from '../api/auth'
+import { ApiError } from '../api/client'
 import {
+  applyIssues,
   hasErrors,
   validateEmail,
   validatePersonalNumber,
@@ -95,6 +98,14 @@ const NO_ERRORS: Errors = {
   team: null,
 }
 
+// The form labels ענף / מדור map onto the backend's anaf / mador fields.
+const FIELD_BY_API_NAME: Record<string, Field> = { anaf: 'branch', mador: 'section' }
+
+function toSignupPayload(data: SignUpData): SignupPayload {
+  const { branch, section, ...rest } = data
+  return { ...rest, anaf: branch, mador: section }
+}
+
 export default function SignUpPage({ onSubmit }: SignUpPageProps) {
   const [values, setValues] = useState<SignUpData>(EMPTY)
   const [errors, setErrors] = useState<Errors>(NO_ERRORS)
@@ -114,6 +125,7 @@ export default function SignUpPage({ onSubmit }: SignUpPageProps) {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (submitting) return
     setSubmitError(null)
 
     const nextErrors = { ...NO_ERRORS }
@@ -128,9 +140,12 @@ export default function SignUpPage({ onSubmit }: SignUpPageProps) {
     setSubmitting(true)
     try {
       if (onSubmit) await onSubmit(data)
-      else console.log('signup ->', data)
+      else await signup(toSignupPayload(data))
       navigate('/menu')
     } catch (err) {
+      if (err instanceof ApiError && err.issues.length > 0) {
+        setErrors((prev) => applyIssues(prev, err.issues, (path) => FIELD_BY_API_NAME[path] ?? path))
+      }
       setSubmitError(err instanceof Error ? err.message : 'ההרשמה נכשלה, נסה שוב')
     } finally {
       setSubmitting(false)

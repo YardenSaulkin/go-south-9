@@ -2,7 +2,14 @@ import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { TextField } from '@mui/material'
 import AuthLayout from '../components/auth/AuthLayout'
 import { navigate } from '../navigation'
-import { hasErrors, validateEmail, validatePersonalNumber } from '../components/auth/validation'
+import { login } from '../api/auth'
+import { ApiError } from '../api/client'
+import {
+  applyIssues,
+  hasErrors,
+  validateEmail,
+  validatePersonalNumber,
+} from '../components/auth/validation'
 
 export interface LoginData {
   personalNumber: string
@@ -40,6 +47,7 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (submitting) return
     setSubmitError(null)
 
     const nextErrors: Errors = {
@@ -57,9 +65,12 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
     setSubmitting(true)
     try {
       if (onSubmit) await onSubmit(data)
-      else console.log('login ->', data)
+      else await login(data)
       navigate('/menu')
     } catch (err) {
+      if (err instanceof ApiError && err.issues.length > 0) {
+        setErrors((prev) => applyIssues(prev, err.issues))
+      }
       setSubmitError(err instanceof Error ? err.message : 'ההתחברות נכשלה, נסה שוב')
     } finally {
       setSubmitting(false)
