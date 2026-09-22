@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   ItemStatus,
+  OrgHierarchyLevel,
   PackingUnitStatus,
   Prisma,
   ShipmentStatus,
@@ -44,7 +45,24 @@ export class PocService {
     const pending = shipments.filter((s) => s.status === ShipmentStatus.arrived);
     const verified = shipments.filter((s) => s.status === ShipmentStatus.verified);
 
-    return { shipments, pending, verified };
+    const isAdmin = user.access.canViewGlobalShipmentsDashboard;
+
+    let unitNamesMap: Record<string, string> | undefined;
+    if (isAdmin) {
+      const unitCodes = [
+        ...new Set(
+          shipments
+            .map((s) => s.orgScope.orgCode?.substring(0, 2))
+            .filter((c): c is string => Boolean(c)),
+        ),
+      ];
+      const mappings = await db.orgHierarchyMapping.findMany({
+        where: { level: OrgHierarchyLevel.unit, code: { in: unitCodes } },
+      });
+      unitNamesMap = Object.fromEntries(mappings.map((m) => [m.code, m.textValue]));
+    }
+
+    return { shipments, pending, verified, unitNames: unitNamesMap };
   }
 
   async verifyShipment(user: CurrentUser, shipmentId: string) {

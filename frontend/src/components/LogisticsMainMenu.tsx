@@ -105,8 +105,12 @@ export default function LogisticsMainMenu({
 
   const baseCards = activeTab === "sending" ? SENDING_CARDS : RECEIVING_CARDS;
   const cards = baseCards;
-  const roleCard =
-    user.role === "admin" ? ADMIN_CARDS[0] : user.role === "poc" ? POC_CARDS[0] : null;
+  const roleCards: ActionCardItem[] =
+    user.role === "admin"
+      ? [ADMIN_CARDS[0], POC_CARDS[0]]
+      : user.role === "poc"
+        ? [POC_CARDS[0]]
+        : [];
 
   const handleTabChange = (
     _: React.MouseEvent<HTMLElement>,
@@ -260,33 +264,37 @@ export default function LogisticsMainMenu({
             </Menu>
           </Box>
 
-          {/* Role shortcut button — admin/POC only */}
-          {roleCard && (
-            <Button
-              onClick={() => onNavigate(roleCard.route)}
-              startIcon={<roleCard.Icon size={16} />}
-              size="small"
-              sx={{
-                fontFamily: 'Heebo, sans-serif',
-                fontWeight: 600,
-                fontSize: '0.82rem',
-                textTransform: 'none',
-                color: 'white',
-                bgcolor: 'rgba(139,94,60,0.55)',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: '999px',
-                px: 2,
-                py: 0.5,
-                alignSelf: 'center',
-                gap: 0.75,
-                '& .MuiButton-startIcon': { margin: 0 },
-                '&:hover': { bgcolor: 'rgba(139,94,60,0.75)' },
-              }}
-            >
-              {roleCard.label}
-            </Button>
+          {/* Role shortcut buttons — admin/POC only */}
+          {roleCards.length > 0 && (
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+              {roleCards.map((rc) => (
+                <Button
+                  key={rc.route}
+                  onClick={() => onNavigate(rc.route)}
+                  startIcon={<rc.Icon size={16} />}
+                  size="small"
+                  sx={{
+                    fontFamily: 'Heebo, sans-serif',
+                    fontWeight: 600,
+                    fontSize: '0.82rem',
+                    textTransform: 'none',
+                    color: 'white',
+                    bgcolor: 'rgba(139,94,60,0.55)',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    borderRadius: '999px',
+                    px: 2,
+                    py: 0.5,
+                    gap: 0.75,
+                    '& .MuiButton-startIcon': { margin: 0 },
+                    '&:hover': { bgcolor: 'rgba(139,94,60,0.75)' },
+                  }}
+                >
+                  {rc.label}
+                </Button>
+              ))}
+            </Box>
           )}
 
           {/* Pill Toggle */}
