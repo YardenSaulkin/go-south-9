@@ -58,7 +58,7 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
     try {
       if (onSubmit) await onSubmit(data)
       else console.log('login ->', data)
-      navigate('/')
+      navigate('/menu')
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'ההתחברות נכשלה, נסה שוב')
     } finally {

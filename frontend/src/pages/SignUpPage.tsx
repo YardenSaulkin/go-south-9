@@ -129,7 +129,7 @@ export default function SignUpPage({ onSubmit }: SignUpPageProps) {
     try {
       if (onSubmit) await onSubmit(data)
       else console.log('signup ->', data)
-      navigate('/')
+      navigate('/menu')
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'ההרשמה נכשלה, נסה שוב')
     } finally {
