@@ -4,12 +4,9 @@ export interface AuthenticatedUser {
   lastName: string | null
   personalNumber: string | null
   email: string
-  role: string
-  unit: string | null
-  anaf: string | null
-  mador: string | null
-  team: string | null
+  role: 'admin' | 'poc' | 'normal'
   orgScopeId: string | null
+  orgCode: string | null
 }
 
 const STORAGE_KEY = 'go-south.user'
