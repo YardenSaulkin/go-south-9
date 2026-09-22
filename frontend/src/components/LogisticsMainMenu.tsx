@@ -279,7 +279,9 @@ export default function LogisticsMainMenu({
                 borderRadius: '999px',
                 px: 2,
                 py: 0.5,
-                alignSelf: 'flex-start',
+                alignSelf: 'center',
+                gap: 0.75,
+                '& .MuiButton-startIcon': { margin: 0 },
                 '&:hover': { bgcolor: 'rgba(139,94,60,0.75)' },
               }}
             >
