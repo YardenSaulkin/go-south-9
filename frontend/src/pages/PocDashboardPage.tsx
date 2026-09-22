@@ -10,7 +10,6 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Divider,
   IconButton,
   createTheme,
   ThemeProvider,
@@ -115,10 +114,8 @@ function ShipmentCard({
             אין יחידות אריזה
           </Typography>
         ) : (
-          shipment.packingUnits.map((pu, idx) => (
-            <Box key={pu.id}>
-              {idx > 0 && <Divider sx={{ my: 0.75 }} />}
-            <Box sx={{ p: 1, borderRadius: 1, bgcolor: 'rgba(0,0,0,0.06)' }}>
+          shipment.packingUnits.map((pu) => (
+            <Box key={pu.id} sx={{ mb: 0.75, p: 1, borderRadius: 1, bgcolor: 'rgba(0,0,0,0.06)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {/* TODO: remove `true ||` after preview */}
                 {(true || pu.status !== EXPECTED_PU_STATUS[shipment.status]) && (
@@ -146,7 +143,6 @@ function ShipmentCard({
                   ))}
                 </Box>
               )}
-            </Box>
             </Box>
           ))
         )}
