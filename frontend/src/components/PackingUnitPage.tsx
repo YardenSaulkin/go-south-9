@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import {
   Box,
   Typography,
@@ -11,6 +11,7 @@ import {
   ThemeProvider,
 } from '@mui/material'
 import { ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
+import PackingUnitSummaryModal from './PackingUnitSummaryModal'
 
 const theme = createTheme({
   direction: 'rtl',
@@ -160,9 +161,11 @@ function CustomSelect({ value, placeholder, options, onChange }: CustomSelectPro
 
 export interface PackingUnitPageProps {
   onBack: () => void
+  user?: { name: string; personalNumber?: string; role?: string } | null
+  orgScope?: { mador?: string; unit?: string | null; anaf?: string | null } | null
 }
 
-export default function PackingUnitPage({ onBack }: PackingUnitPageProps) {
+export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitPageProps) {
   const [packagingType, setPackagingType] = useState('קרטון מקוטע')
   const [items, setItems] = useState<PackingUnit[]>(INITIAL_ITEMS)
   const [sourceText, setSourceText] = useState('')
@@ -173,6 +176,8 @@ export default function PackingUnitPage({ onBack }: PackingUnitPageProps) {
   const [floor, setFloor] = useState('')
   const [building, setBuilding] = useState('')
   const [toastOpen, setToastOpen] = useState(false)
+  const [summaryOpen, setSummaryOpen] = useState(false)
+  const [serialNumber, setSerialNumber] = useState('56789')
 
   const anyItemChecked = items.some((item) => item.subItems.some((s) => s.checked))
   const allFilled = branch && room && warehouse && floor && building && anyItemChecked
@@ -211,7 +216,25 @@ export default function PackingUnitPage({ onBack }: PackingUnitPageProps) {
   const handleFinish = () => {
     if (!allFilled) {
       setToastOpen(true)
+      return
     }
+    setSummaryOpen(true)
+  }
+
+  const handleContinuePacking = () => {
+    setSummaryOpen(false)
+    setItems((prev) =>
+      prev.map((item) => ({
+        ...item,
+        subItems: item.subItems.map((s) => ({ ...s, checked: false })),
+      }))
+    )
+    setSerialNumber(String(Math.floor(10000 + Math.random() * 90000)))
+  }
+
+  const handleExitPacking = () => {
+    setSummaryOpen(false)
+    onBack()
   }
 
   const sectionCardSx = {
@@ -592,9 +615,35 @@ export default function PackingUnitPage({ onBack }: PackingUnitPageProps) {
               }),
             }}
           >
-            סיים אריזה
+            סיום אריזה
           </Box>
         </Box>
+
+        {/* Packing Unit Summary Modal */}
+        <PackingUnitSummaryModal
+          open={summaryOpen}
+          serialNumber={serialNumber}
+          source={{
+            unit: sourceText || orgScope?.unit || 'יחידת מצו"ב',
+            anaf: branch || orgScope?.anaf || 'ענף חוכמה',
+            mador: orgScope?.mador || 'מדור מוח',
+            room: room || warehouse || 'חדר 208',
+          }}
+          destination={{
+            building: building || 'בניין A',
+            floor: floor || 'קומה 3',
+            room: destText || 'חדר 309',
+          }}
+          madorSupervisor="שם אחראי"
+          roomSupervisor="שם אחראי"
+          packerName={
+            user?.name
+              ? `${user.name} ${user.personalNumber || '9223345'}`
+              : 'שימי שמעוני 9223345'
+          }
+          onContinue={handleContinuePacking}
+          onExit={handleExitPacking}
+        />
 
         {/* Toast */}
         <Snackbar

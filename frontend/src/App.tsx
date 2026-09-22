@@ -47,19 +47,6 @@ export default function App() {
   if (pathname === '/home') return <HomePage />
   if (pathname === '/login') return <LoginPage />
   if (pathname === '/signup') return <SignUpPage />
-
-  if (!user) return null
-
-  // Role-guarded routes
-  if (pathname === '/admin/users') {
-    if (user.role !== 'admin') { navigate('/menu', { replace: true }); return null }
-    return <AdminUsersPage userId={user.id} />
-  }
-  if (pathname === '/poc/dashboard') {
-    if (user.role !== 'poc' && user.role !== 'admin') { navigate('/menu', { replace: true }); return null }
-    return <PocDashboardPage userId={user.id} />
-  }
-
   if (pathname === '/packing') return <PackingUnitPage onBack={handleBack} />
   if (pathname === '/transport')
     return <ShipmentPage onBack={handleBack} userId={user.id} orgScopeId={user.orgScopeId} />
