@@ -12,6 +12,7 @@ import { ReceivingController } from './controllers/receiving.controller.js';
 import { ShipmentController } from './controllers/shipment.controller.js';
 import { AuthService } from './services/auth.service.js';
 import { DashboardService } from './services/dashboard.service.js';
+import { OrgHierarchyService } from './services/org-hierarchy.service.js';
 import { DistributionService } from './services/distribution.service.js';
 import { PackingService } from './services/packing.service.js';
 import { ReceivingService } from './services/receiving.service.js';
@@ -52,6 +53,7 @@ const observeAppSecret = process.env.OBSERVE_APP_SECRET;
     AppService,
     AuthService,
     CurrentUserService,
+    OrgHierarchyService,
     PackingService,
     ShipmentService,
     ReceivingService,

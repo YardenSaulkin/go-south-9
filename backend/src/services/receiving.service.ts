@@ -13,7 +13,7 @@ import {
 } from '@prisma/client';
 import type { CurrentUser } from '../auth/current-user.service.js';
 import type { ReceivingInput } from '../domain/operations.schemas.js';
-import { assertCanAccessMador } from '../domain/permissions.js';
+import { assertCanAccessMador, assertCanAccessOrgScope } from '../domain/permissions.js';
 import {
   assertPackingUnitTransition,
   assertShipmentTransition,
@@ -38,7 +38,9 @@ export class ReceivingService {
           ? { orgScopeId }
           : user.access.canViewGlobalShipmentsDashboard
             ? {}
-            : { orgScope: { mador: user.access.accessMador ?? '' } }),
+            : user.access.accessUnitCode
+              ? { orgScope: { orgCode: { startsWith: user.access.accessUnitCode } } }
+              : { orgScope: { mador: user.access.accessMador ?? '' } }),
       },
       include: {
         packingUnits: {
@@ -64,7 +66,7 @@ export class ReceivingService {
       include: { orgScope: true, packingUnits: true },
     });
     if (!shipment) throw new NotFoundException('ההובלה לא נמצאה');
-    assertCanAccessMador(user.access, shipment.orgScope.mador);
+    assertCanAccessOrgScope(user.access, shipment.orgScope.mador, shipment.orgScope.orgCode ?? null);
 
     const summary = summarizeReceiving(
       shipment.packingUnits.map((unit) => unit.id),
