@@ -8,6 +8,7 @@ import PocDashboardPage from './pages/PocDashboardPage'
 import { navigate, usePathname } from './navigation'
 import PackingUnitPage from './components/PackingUnitPage'
 import ShipmentPage from './components/ShipmentPage'
+import ReceivingPage from './components/ReceivingPage'
 import { useCurrentUser } from './auth/useCurrentUser'
 import { clearCurrentUser, userDisplayName } from './auth/session'
 
@@ -32,6 +33,7 @@ export default function App() {
   const handleNavigate = (route: NavigateRoute) => {
     if (route === 'packing') navigate('/packing')
     else if (route === 'transport') navigate('/transport')
+    else if (route === 'receiving') navigate('/receiving')
     else if (route === 'admin') navigate('/admin/users')
     else if (route === 'poc') navigate('/poc/dashboard')
     else console.log('navigate ->', route)
@@ -48,6 +50,14 @@ export default function App() {
   if (pathname === '/login') return <LoginPage />
   if (pathname === '/signup') return <SignUpPage />
   if (pathname === '/packing') return <PackingUnitPage onBack={handleBack} />
+  if (pathname === '/receiving')
+    return (
+      <ReceivingPage
+        userId={user.id}
+        onExit={handleBack}
+        onNavigate={handleNavigate}
+      />
+    )
   if (pathname === '/transport')
     return <ShipmentPage onBack={handleBack} userId={user.id} orgScopeId={user.orgScopeId} />
 
