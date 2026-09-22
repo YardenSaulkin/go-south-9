@@ -15,10 +15,31 @@ enum OrgScopeLevel {
   @@map("org_scope_level")
 }
 
+enum OrgHierarchyLevel {
+  unit
+  anaf
+  mador
+  team
+
+  @@map("org_hierarchy_level")
+}
+
+model OrgHierarchyMapping {
+  id        String            @id @default(uuid()) @db.Uuid
+  level     OrgHierarchyLevel
+  textValue String            @map("text_value")
+  code      String            @db.Char(2)
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([level, textValue])
+  @@unique([level, code])
+  @@map("org_hierarchy_mappings")
+}
+
 enum UserRole {
-  super_user
-  logistics_user
-  regular_user
+  admin
+  poc
+  normal
 
   @@map("user_role")
 }
@@ -92,6 +113,7 @@ model OrgScope {
   anaf        String?
   mador       String
   team        String?
+  orgCode     String?       @map("org_code") @db.Char(8)
   description String?
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -111,10 +133,7 @@ model User {
   lastName        String?  @map("last_name")
   personalNumber  String?  @unique @map("personal_number")
   role            UserRole
-  unit            String?
-  anaf            String?
-  mador           String?
-  team            String?
+  orgCode         String?  @map("org_code") @db.Char(8)
   orgScopeId      String?  @map("org_scope_id") @db.Uuid
   createdByUserId String?  @map("created_by_user_id") @db.Uuid
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -221,15 +240,17 @@ model Item {
 }
 
 view UserAccessProfile {
-  userId                          String   @map("user_id") @db.Uuid
+  userId                          String    @map("user_id") @db.Uuid
   role                            UserRole
-  accessMador                     String?  @map("access_mador")
-  canCreateShipments              Boolean  @map("can_create_shipments")
-  canCreatePackingUnits           Boolean  @map("can_create_packing_units")
-  canViewShipments                Boolean  @map("can_view_shipments")
-  canViewPackingUnits             Boolean  @map("can_view_packing_units")
-  canViewGlobalShipmentsDashboard Boolean  @map("can_view_global_shipments_dashboard")
-  dataVisibilityScope             String?  @map("data_visibility_scope")
+  accessMador                     String?   @map("access_mador")
+  accessUnitCode                  String?   @map("access_unit_code")
+  canCreateShipments              Boolean   @map("can_create_shipments")
+  canCreatePackingUnits           Boolean   @map("can_create_packing_units")
+  canViewShipments                Boolean   @map("can_view_shipments")
+  canViewPackingUnits             Boolean   @map("can_view_packing_units")
+  canViewGlobalShipmentsDashboard Boolean   @map("can_view_global_shipments_dashboard")
+  canApproveShipments             Boolean   @map("can_approve_shipments")
+  dataVisibilityScope             String?   @map("data_visibility_scope")
 
   @@map("user_access_profiles")
 }

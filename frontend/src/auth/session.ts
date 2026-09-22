@@ -4,12 +4,9 @@ export interface AuthenticatedUser {
   lastName: string | null
   personalNumber: string | null
   email: string
-  role: string
-  unit: string | null
-  anaf: string | null
-  mador: string | null
-  team: string | null
+  role: 'admin' | 'poc' | 'normal'
   orgScopeId: string | null
+  orgCode: string | null
 }
 
 const STORAGE_KEY = 'go-south.user'
@@ -58,9 +55,9 @@ export function userDisplayName(user: AuthenticatedUser): string {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  super_user: 'משתמש על',
-  logistics_user: 'משתמש לוגיסטי',
-  regular_user: 'משתמש רגיל',
+  admin: 'מנהל',
+  poc: 'קצין קישור',
+  normal: 'משתמש',
 }
 
 export function userRoleLabel(user: AuthenticatedUser): string {

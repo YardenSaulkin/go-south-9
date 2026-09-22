@@ -9,7 +9,7 @@ export interface CurrentUser {
   email: string;
   role: UserRole;
   orgScopeId: string | null;
-  mador: string | null;
+  orgCode: string | null;
   access: AccessProfile;
 }
 
@@ -21,9 +21,8 @@ export class CurrentUserService {
         id: true,
         email: true,
         role: true,
-        mador: true,
-        team: true,
         orgScopeId: true,
+        orgCode: true,
       },
       orderBy: { email: 'asc' },
     });
@@ -49,8 +48,19 @@ export class CurrentUserService {
       email: user.email,
       role: user.role,
       orgScopeId: user.orgScopeId,
-      mador: user.mador,
-      access,
+      orgCode: user.orgCode,
+      access: {
+        role: access.role,
+        accessMador: access.accessMador,
+        accessUnitCode: access.accessUnitCode,
+        canCreateShipments: access.canCreateShipments,
+        canCreatePackingUnits: access.canCreatePackingUnits,
+        canViewShipments: access.canViewShipments,
+        canViewPackingUnits: access.canViewPackingUnits,
+        canViewGlobalShipmentsDashboard: access.canViewGlobalShipmentsDashboard,
+        canApproveShipments: access.canApproveShipments,
+        dataVisibilityScope: access.dataVisibilityScope,
+      },
     };
   }
 }
