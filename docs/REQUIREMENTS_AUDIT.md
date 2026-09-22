@@ -81,3 +81,20 @@ Statuses describe repository evidence as of 2026-09-22. `IMPLEMENTED_NOT_VERIFIE
 - Live DB introspection, DB writes, API E2E, and manual browser verification
   remain blocked by the unreachable configured Supabase pooler. No migration
   was applied.
+
+## Packing UI restoration and data-model addendum (2026-09-22)
+
+- The previous approved Packing composition was restored from the parent of
+  `f640825`: desert background, centered RTL header/back arrow, translucent
+  rounded cards, pill selectors, grouped Item cards, and fixed bottom action.
+- The restored component keeps the newer live context, hierarchy cascade,
+  source-room loading, mapping guard, personal-carton exception, grouped Item
+  quantities, descriptions, idempotent POST, and success/Continue routing.
+- Completion data now distinguishes structured source/destination from free
+  text, includes the committed main description, returns `responsiblePeople`
+  and real packer details, and snapshots responsible-person fields as null when
+  no authoritative source is available.
+- The status lifecycle remains explicit; zero-Item personal cartons require
+  explicit verification at distribution finalization.
+- Visual browser inspection at 375/390/393/430px, tablet, and desktop is not
+  claimed here because the browser provider is unavailable in this environment.

@@ -43,6 +43,12 @@ description. `destination_description` remains a JSON snapshot of the committed
 Destination details so historical PackingUnits remain understandable if the
 catalog later changes.
 
+PackingUnit also stores nullable destination building/floor fields and nullable
+source room/mador responsible-person snapshots. These snapshots are historical
+completion data, not live joins. The committed `createdBy` User is returned as
+the packer, including nullable first name, last name, personal number, and
+phone when those columns are populated.
+
 ### `items`
 
 Description, optional PackingUnit, lifecycle status, external mapping/room identifiers, source/destination, scope, owner/creator, quantity, and timestamps. External identifiers remain text and have no local foreign keys.
@@ -79,6 +85,8 @@ The unapplied migration at `backend/prisma/migrations/20260922_hackathon_operati
 - `operation_requests` for replay-safe finalization.
 - `operation_events` for actor/state audit.
 - `discrepancies` for missing Item/PackingUnit quantities without changing movement enums.
+- nullable User identity/contact fields for real packer details.
+- nullable PackingUnit destination building/floor and responsible-person snapshots.
 
 The separate pending auth migration
 `backend/prisma/migrations/20260922_auth_identity_fields/migration.sql` adds
@@ -121,9 +129,10 @@ provenance fallback, not a claim that the local database contains the complete
 South Operation mapping state.
 
 The completion response reads the committed PackingUnit, its scope, its
-createdBy user, its persisted destination JSON, and its associated Items. Mador
-and room responsible-person fields are intentionally returned as `לא הוגדר`
-until authoritative data exists.
+createdBy user, its structured destination fields, its optional descriptions,
+and its associated Items. Mador and room responsible-person fields are null
+until authoritative data exists; the UI renders that unresolved state without
+fabricating a person.
 
 ## Limitations
 

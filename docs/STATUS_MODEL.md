@@ -37,6 +37,13 @@ source room; `personal_carton` is the explicit zero-Item exception. Partial
 quantities split the source Item transactionally so the remainder stays
 `not_sent`.
 
+The UI labels the PackingUnit statuses as follows: `not_sent` = טרם שובצה
+להובלה, `assigned_to_shipment` = שובצה להובלה, `in_transit` = בדרך,
+`arrived_pending_verification` = הגיעה וממתינה לאימות, and `verified` = אומתה
+בקבלה. A personal carton with zero Items still remains
+`arrived_pending_verification` until an explicit empty-unit verification is
+submitted; it is never auto-verified because it has no child rows.
+
 ## Discrepancy lifecycle
 
 `missing` is deliberately not a movement status.

@@ -97,26 +97,20 @@
 - **Decision:** Return the real packer email from the committed `createdBy` relation and display `לא הוגדר` for responsible-person fields because the current data model has no authoritative source for them.
 - **Impact:** No names are fabricated for visual parity.
 
-## AD-017 — Code-backed organizational hierarchy with explicit legacy fallback
+## AD-017 — Packing data-model gap resolution
 
-- **Decision:** Add nullable `org_scopes.org_code`. A non-null code must be
-  exactly eight digits and is parsed centrally as Unit/Anaf/Mador/Team pairs.
-  Context responses expose those parsed segments so the client does not duplicate
-  parser logic. Rows without a full code remain legacy textual scopes; they are
-  filtered by their existing fields and never inferred from partial values.
-- **Impact:** Code-backed Team selections use the full eight-digit code, avoiding
-  collisions between repeated hierarchy names. Live legacy data must be reviewed
-  before any backfill.
+- **Question:** Which completion data was missing from the PackingUnit contract?
+- **Decision:** Add nullable `users.first_name`, `last_name`, `personal_number`, and `phone` for real packer details. Add nullable PackingUnit destination building/floor and source room/mador responsible-person snapshot fields. Keep the existing structured room identifiers and free-text descriptions separate.
+- **Impact:** A completed unit can reproduce the historical context it committed with. Responsible-person values remain null when no authoritative source exists; no contact is invented.
 
-## AD-018 — Room cache and destination catalog snapshots
+## AD-018 — Description provenance
 
-- **Decision:** Source Rooms are resolved from local Item provenance until an
-  authoritative Room integration is available. The selected Room must exist in
-  the authorized scope and its description is read-only and server-snapshotted.
-  Add a scoped Destination catalog for `existing`/`new` destination selection.
-  Existing destinations are read only; new destinations and their PackingUnit are
-  created in the same serializable transaction. PackingUnits preserve committed
-  source and destination snapshots.
-- **Impact:** Item visibility is room-based rather than owner-based, while scope
-  authorization remains server enforced. The new migration is pending live DB
-  introspection and must not be applied blindly.
+- **Question:** How should structured source/destination values differ from operator-entered descriptions?
+- **Decision:** Persist the main PackingUnit description, optional `source_description`, and optional `destination_description` independently. Structured unit/anaf/mador/room and building/floor/room fields remain machine-readable. Non-personal main descriptions are generated from selected Items until the operator edits them; personal cartons require an explicit description.
+- **Impact:** Free text does not overwrite structured operational data, and the success response can return both forms.
+
+## AD-019 — Empty personal-carton verification
+
+- **Question:** Can a zero-Item personal carton be auto-verified?
+- **Decision:** No. A personal carton with no child Items requires an explicit empty-unit verification flag at distribution finalization. The normal lifecycle remains `not_sent → assigned_to_shipment → in_transit → arrived_pending_verification → verified`.
+- **Impact:** The zero-Item exception applies only to creation and does not weaken receiving verification or auditability.

@@ -86,6 +86,15 @@ South Operation API (contract unavailable)
 
 Arbitrary status dropdowns do not exist. Domain transition functions permit only the documented path; database verification triggers remain authoritative.
 
+Packing completion returns the committed `description`, structured source and
+destination, optional source/destination descriptions, `responsiblePeople`,
+and the real `createdBy` packer details. The frontend has one central Hebrew
+label map for PackingUnit statuses and does not translate status values into a
+generic editable control.
+
+For a zero-Item `personal_carton`, distribution finalization must carry an
+explicit empty-unit verification flag before the parent can become `verified`.
+
 ## Errors
 
 - Validation and business conflicts return Hebrew messages.

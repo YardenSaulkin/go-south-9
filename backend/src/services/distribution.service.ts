@@ -161,6 +161,11 @@ export class DistributionService {
           if (preview.missingQuantity === 0) {
             assertPackingUnitCanVerify(
               freshUnit.items.map(() => ItemStatus.verified),
+              {
+                packingUnitType: freshUnit.packingUnitType ?? undefined,
+                explicitEmptyUnitVerification:
+                  input.explicitEmptyUnitVerification,
+              },
             );
             assertPackingUnitTransition(
               freshUnit.status,

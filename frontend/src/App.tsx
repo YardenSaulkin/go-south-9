@@ -16,6 +16,8 @@ type NavigateRoute = 'packing' | 'transport' | 'receiving' | 'distribution' | 'a
 
 const PUBLIC_ROUTES = ['/home', '/login', '/signup']
 
+const FALLBACK_USER = { name: 'דני', personalNumber: '1234567', role: 'מפקד' }
+
 export default function App() {
   const pathname = usePathname()
   const user = useCurrentUser()
@@ -39,7 +41,6 @@ export default function App() {
     else if (route === 'poc') navigate('/poc/dashboard')
     else console.log('navigate ->', route)
   }
-
   const handleBack = () => navigate('/menu')
 
   const handleLogout = () => {
@@ -100,11 +101,7 @@ export default function App() {
     initialDraft={packingDraft}
     authenticatedUserId={user.id}
     onBack={handleBack}
-    onComplete={(response, draft) => {
-      setPackingDraft(draft)
-      setPackingSuccess(response)
-      navigate('/packing/success')
-    }}
+    onComplete={(response, draft) => { setPackingDraft(draft); setPackingSuccess(response); navigate('/packing/success') }}
   />
   if (pathname === '/transport')
     return <ShipmentPage onBack={handleBack} userId={user.id} orgScopeId={user.orgScopeId} />

@@ -38,7 +38,16 @@ Physical movement creates gaps between expected and actual equipment. Operators 
 
 ### Packing
 
-Unit → Anaf → Mador → optional Team cascades from OrgScope. Room options derive from available Item provenance, while the operator may enter a room identifier when creating a personal carton. Non-personal packing types require a mapped source room and Item selection; a personal carton is a real zero-Item PackingUnit. Confirmation validates scope, mapping, availability, quantities, destination, actor, and idempotency inside a Serializable transaction. The committed response drives the success screen, and Continue retains only source/destination form state.
+Unit → Anaf → Mador → room cascades from OrgScope and persisted Item
+provenance. Non-personal packing types require a mapped source room and Item
+selection; a personal carton is a real zero-Item PackingUnit. The large main
+description is generated from selected Items until manually edited, while a
+personal carton requires explicit text. Optional source and destination free
+text remain separate from structured fields. Confirmation validates scope,
+mapping, availability, quantities, destination, actor, and idempotency inside a
+Serializable transaction. The committed response drives the success screen,
+and Continue retains only source/destination structured values and optional
+descriptions.
 
 ### Transport
 
@@ -83,7 +92,11 @@ SSO/Supabase Auth claims and an RLS review; neither is falsely claimed complete.
 
 ## UX architecture
 
-The product uses a quiet industrial control-room visual language: navy/teal structural surfaces, orange primary actions, visible operational counts, explicit two-step discrepancy confirmation, and large controls. All user-facing workflow text is Hebrew and RTL-aware.
+The Packing product preserves the approved desert/orange mobile composition:
+large RTL typography, rounded translucent cards, styled type pills, grouped
+Item rows, and a fixed full-width `סיים אריזה` action. New controls use the
+same MUI/Lucide visual language rather than introducing a second raw HTML
+presentation. All user-facing workflow text is Hebrew and RTL-aware.
 
 ## Error handling
 

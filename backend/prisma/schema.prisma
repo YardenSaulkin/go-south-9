@@ -214,6 +214,12 @@ model PackingUnit {
   destinationDescription String?           @map("destination_description")
   sourceRoomId           String?           @map("source_room_id")
   destinationRoomId      String?           @map("destination_room_id")
+  destinationBuilding    String?           @map("destination_building")
+  destinationFloor       String?           @map("destination_floor")
+  sourceRoomResponsibleName  String?       @map("source_room_responsible_name")
+  sourceRoomResponsiblePhone String?      @map("source_room_responsible_phone")
+  sourceMadorResponsibleName String?      @map("source_mador_responsible_name")
+  sourceMadorResponsiblePhone String?     @map("source_mador_responsible_phone")
   orgScopeId             String            @map("org_scope_id") @db.Uuid
   ownerUserId            String?           @map("owner_user_id") @db.Uuid
   createdByUserId        String            @map("created_by_user_id") @db.Uuid

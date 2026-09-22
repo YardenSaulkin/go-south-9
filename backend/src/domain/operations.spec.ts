@@ -73,6 +73,17 @@ describe('operational domain rules', () => {
       assertPackingUnitCanVerify([ItemStatus.verified]),
     ).not.toThrow();
     expect(() =>
+      assertPackingUnitCanVerify([], {
+        packingUnitType: PackingUnitType.personal_carton,
+      }),
+    ).toThrow('קרטון אישי דורש אימות קבלה מפורש');
+    expect(() =>
+      assertPackingUnitCanVerify([], {
+        packingUnitType: PackingUnitType.personal_carton,
+        explicitEmptyUnitVerification: true,
+      }),
+    ).not.toThrow();
+    expect(() =>
       assertShipmentCanVerify([
         PackingUnitStatus.verified,
         PackingUnitStatus.in_transit,
@@ -139,6 +150,28 @@ describe('operational domain rules', () => {
         items: [{ itemId: '123e4567-e89b-12d3-a456-426614174002', quantity: 1 }],
       }).success,
     ).toBe(false);
+    const withOptionalDescriptions = createPackingUnitSchema.safeParse({
+      ...base,
+      description: 'קרטון אישי עם ציוד אישי',
+      sourceDescription: 'מדף עליון ליד הכניסה',
+      destination: {
+        ...base.destination,
+        description: 'להניח בחדר הקליטה',
+      },
+      packingUnitType: PackingUnitType.personal_carton,
+      items: [],
+    });
+    expect(withOptionalDescriptions.success).toBe(true);
+    expect(
+      createPackingUnitSchema.safeParse({
+        ...base,
+        description: '',
+        packingUnitType: PackingUnitType.personal_carton,
+        items: [],
+      }).error?.issues.some(
+        ({ message }) => message === 'יש להזין פירוט עבור קרטון אישי',
+      ),
+    ).toBe(true);
     expect(
       createPackingUnitSchema.safeParse({
         ...base,

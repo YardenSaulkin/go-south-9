@@ -3,13 +3,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
 import {
   ItemStatus,
   PackingUnitStatus,
   Prisma,
-  type Destination,
-  type OrgScope,
 } from '@prisma/client';
 import type { CurrentUser } from '../auth/current-user.service.js';
 import {
@@ -29,47 +26,7 @@ import type { CreatePackingUnitInput } from '../domain/operations.schemas.js';
 import type { DestinationSelection } from '../domain/destination.js';
 import { db } from '../lib/db.js';
 
-type DatabaseClient = Prisma.TransactionClient | typeof db;
-
-export function eligibleItemsWhere(orgScopeId: string, sourceRoomId: string) {
-  return {
-    orgScopeId,
-    sourceRoomId,
-    packingUnitId: null,
-    status: ItemStatus.not_sent,
-    sourceMappingReportId: { not: '' },
-  };
-}
-
-export interface SourceRoomDetails {
-  id: string;
-  description: string | null;
-  mappingStatus: RoomMappingStatus;
-  roomResponsible: string | null;
-  orgCode: string | null;
-}
-
-export interface DestinationSnapshot {
-  id: string | null;
-  code: string;
-  description: string;
-  building: string;
-  floor: string;
-  room: string;
-}
-
-function serializeDestination(destination: Destination): string {
-  return JSON.stringify({
-    id: destination.id,
-    code: destination.destinationCode,
-    description: destination.description,
-    building: destination.building,
-    floor: destination.floor,
-    room: destination.room,
-  } satisfies DestinationSnapshot);
-}
-
-function parseDestination(value: string | null): DestinationSnapshot | null {
+function parseLegacyDestination(value: string | null) {
   if (!value) return null;
   try {
     const parsed = JSON.parse(value) as Partial<DestinationSnapshot>;
@@ -337,9 +294,17 @@ export class PackingService {
               status: PackingUnitStatus.not_sent,
               packingUnitType: input.packingUnitType,
               sourceRoomId: input.sourceRoomId,
-              sourceDescription: sourceRoom.description,
-              destinationRoomId: destination.destinationCode,
-              destinationDescription: serializeDestination(destination),
+              sourceDescription: input.sourceDescription?.trim() || null,
+              destinationRoomId:
+                input.destination.roomId ?? input.destination.room,
+              destinationBuilding: input.destination.building,
+              destinationFloor: input.destination.floor,
+              destinationDescription:
+                input.destination.description?.trim() || null,
+              sourceRoomResponsibleName: null,
+              sourceRoomResponsiblePhone: null,
+              sourceMadorResponsibleName: null,
+              sourceMadorResponsiblePhone: null,
               orgScopeId: scope.id,
               ownerUserId: user.id,
               createdByUserId: user.id,
@@ -474,7 +439,16 @@ export class PackingService {
     }>,
     fallbackPacker: string,
   ) {
-    const destination = parseDestination(unit.destinationDescription);
+    const legacyDestination = parseLegacyDestination(
+      unit.destinationDescription,
+    );
+    const displayName = [
+      unit.createdBy.firstName,
+      unit.createdBy.lastName,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
     return {
       packingUnit: {
         id: unit.id,
@@ -484,28 +458,47 @@ export class PackingService {
         type: unit.packingUnitType,
         status: unit.status,
         itemCount: unit.items.length,
+        description: unit.description,
       },
       source: {
         orgScopeId: unit.orgScopeId,
         unit: unit.orgScope.unit,
         anaf: unit.orgScope.anaf,
         mador: unit.orgScope.mador,
-        team: unit.orgScope.team,
-        room: unit.sourceRoomId,
-        sourceDescription: unit.sourceDescription,
+        roomId: unit.sourceRoomId,
+        roomDisplayName: unit.sourceRoomId,
+        description: unit.sourceDescription,
       },
-      destination: destination ?? {
-        id: null,
-        code: unit.destinationRoomId ?? '',
-        description: '',
-        building: '',
-        floor: '',
-        room: unit.destinationRoomId ?? '',
+      destination: {
+        building: unit.destinationBuilding ?? legacyDestination?.building ?? '',
+        floor: unit.destinationFloor ?? legacyDestination?.floor ?? '',
+        room: unit.destinationRoomId ?? legacyDestination?.room ?? '',
+        roomId: unit.destinationRoomId,
+        description: legacyDestination
+          ? null
+          : unit.destinationDescription,
       },
-      responsibilities: {
-        madorResponsible: 'לא הוגדר',
-        roomResponsible: 'לא הוגדר',
-        packer: unit.createdBy.email || fallbackPacker,
+      responsiblePeople: {
+        mador: unit.sourceMadorResponsibleName
+          ? {
+              name: unit.sourceMadorResponsibleName,
+              phone: unit.sourceMadorResponsiblePhone,
+            }
+          : null,
+        room: unit.sourceRoomResponsibleName
+          ? {
+              name: unit.sourceRoomResponsibleName,
+              phone: unit.sourceRoomResponsiblePhone,
+            }
+          : null,
+        packer: {
+          userId: unit.createdBy.id,
+          firstName: unit.createdBy.firstName,
+          lastName: unit.createdBy.lastName,
+          personalNumber: unit.createdBy.personalNumber,
+          email: unit.createdBy.email || fallbackPacker,
+          displayName: displayName || unit.createdBy.email || fallbackPacker,
+        },
       },
       items: unit.items.map((item) => ({
         id: item.id,

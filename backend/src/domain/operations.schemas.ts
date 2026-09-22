@@ -8,16 +8,18 @@ export const destinationSchema = z.object({
   floor: z.string().trim().min(1, 'יש להזין קומה').max(50),
   room: z.string().trim().min(1, 'יש להזין חדר').max(100),
   roomId: z.string().trim().max(200).optional(),
+  description: z.string().trim().max(1000).optional(),
 });
 
 export const createPackingUnitSchema = z
   .object({
     idempotencyKey: uuidSchema,
     orgScopeId: uuidSchema,
-    description: z.string().trim().min(2, 'יש להזין תיאור').max(300),
+    description: z.string().trim().max(1000),
     packingUnitType: z.nativeEnum(PackingUnitType),
     sourceRoomId: z.string().trim().min(1, 'יש לבחור חדר מקור').max(200),
-    destination: destinationSelectionSchema,
+    sourceDescription: z.string().trim().max(1000).optional(),
+    destination: destinationSchema,
     items: z
       .array(
         z.object({
@@ -28,6 +30,16 @@ export const createPackingUnitSchema = z
       .max(500),
   })
   .superRefine((value, context) => {
+    if (!value.description) {
+      context.addIssue({
+        code: 'custom',
+        path: ['description'],
+        message:
+          value.packingUnitType === PackingUnitType.personal_carton
+            ? 'יש להזין פירוט עבור קרטון אישי'
+            : 'יש להזין פירוט יחידת אריזה',
+      });
+    }
     if (
       value.packingUnitType === PackingUnitType.personal_carton &&
       value.items.length > 0
@@ -90,6 +102,7 @@ export type ReceivingInput = z.infer<typeof receivingSchema>;
 export const distributionSchema = z.object({
   idempotencyKey: uuidSchema,
   finalConfirmation: z.boolean(),
+  explicitEmptyUnitVerification: z.boolean().default(false),
   items: z.array(
     z.object({
       itemId: uuidSchema,

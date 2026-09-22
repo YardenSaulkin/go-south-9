@@ -304,3 +304,48 @@ export async function verifyShipment(shipmentId: string, userId: string): Promis
     throw new Error((err as { message?: string }).message ?? `Verification failed: ${res.status}`)
   }
 }
+
+export interface CreatePackingUnitPayload {
+  idempotencyKey: string
+  orgScopeId: string
+  description: string
+  packingUnitType: string
+  sourceRoomId?: string
+  sourceDescription?: string
+  destination: { building: string; floor: string; room: string }
+  items: { itemId: string; quantity: number }[]
+}
+
+export interface PackingUnit {
+  id: string
+  description: string
+  displaySerial: string
+  serialNumber: number | null
+  items: { id: string; description: string; quantity: number }[]
+}
+
+export async function fetchEligibleItems(
+  orgScopeId: string,
+  userId: string,
+): Promise<EligibleItem[]> {
+  const url = `${BASE_URL}/api/packing-units/eligible-items?orgScopeId=${encodeURIComponent(orgScopeId)}`
+  const res = await fetch(url, { headers: headers(userId) })
+  if (!res.ok) throw new Error(`Eligible items fetch failed: ${res.status}`)
+  return res.json()
+}
+
+export async function createPackingUnit(
+  payload: CreatePackingUnitPayload,
+  userId: string,
+): Promise<PackingUnit> {
+  const res = await fetch(`${BASE_URL}/api/packing-units`, {
+    method: 'POST',
+    headers: headers(userId),
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { message?: string }).message ?? `Packing unit creation failed: ${res.status}`)
+  }
+  return res.json()
+}

@@ -1,5 +1,10 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { ItemStatus, PackingUnitStatus, ShipmentStatus } from '@prisma/client';
+import {
+  ItemStatus,
+  PackingUnitStatus,
+  PackingUnitType,
+  ShipmentStatus,
+} from '@prisma/client';
 
 const shipmentTransitions: Record<ShipmentStatus, ShipmentStatus[]> = {
   not_sent: [ShipmentStatus.sent],
@@ -53,7 +58,20 @@ export function assertItemTransition(
   }
 }
 
-export function assertPackingUnitCanVerify(childStatuses: ItemStatus[]): void {
+export function assertPackingUnitCanVerify(
+  childStatuses: ItemStatus[],
+  options: {
+    packingUnitType?: PackingUnitType;
+    explicitEmptyUnitVerification?: boolean;
+  } = {},
+): void {
+  if (
+    options.packingUnitType === PackingUnitType.personal_carton &&
+    childStatuses.length === 0 &&
+    !options.explicitEmptyUnitVerification
+  ) {
+    throw new ConflictException('קרטון אישי דורש אימות קבלה מפורש');
+  }
   if (childStatuses.some((status) => status !== ItemStatus.verified)) {
     throw new ConflictException('לא ניתן לאמת יחידת אריזה עם פריטים שלא אומתו');
   }
