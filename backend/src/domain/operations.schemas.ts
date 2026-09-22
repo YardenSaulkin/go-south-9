@@ -51,7 +51,7 @@ export const createShipmentSchema = z
     transportDescription: z.string().trim().max(300).optional(),
     vehicleIdentifier: z.string().trim().min(2).max(100),
     transportAt: z.coerce.date(),
-    destination: destinationSchema,
+    destination: destinationSchema.optional(),
     packingUnitIds: z.array(uuidSchema).min(1, 'יש לבחור יחידת אריזה'),
   })
   .superRefine((value, context) => {
