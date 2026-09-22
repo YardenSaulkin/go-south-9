@@ -23,38 +23,29 @@ export class AdminService {
   constructor(private readonly orgHierarchy: OrgHierarchyService) {}
 
   async listUsers(): Promise<AdminUserView[]> {
-    const [users, mappings] = await Promise.all([
-      db.user.findMany({
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-      }),
-      this.orgHierarchy.listAll(),
+    const [users, allMappings] = await Promise.all([
+      db.user.findMany({ orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }] }),
+      db.orgHierarchyMapping.findMany(),
     ]);
-    const namesBySegment = new Map(
-      mappings.map((mapping) => [
-        `${mapping.level}:${mapping.code}`,
-        mapping.textValue,
-      ]),
-    );
 
-    return users.map((u) => {
-      const orgNames = u.orgCode?.length === 8 ? {
-        unit: namesBySegment.get(`unit:${u.orgCode.slice(0, 2)}`) ?? u.orgCode.slice(0, 2),
-        anaf: namesBySegment.get(`anaf:${u.orgCode.slice(2, 4)}`) ?? u.orgCode.slice(2, 4),
-        mador: namesBySegment.get(`mador:${u.orgCode.slice(4, 6)}`) ?? u.orgCode.slice(4, 6),
-        team: namesBySegment.get(`team:${u.orgCode.slice(6, 8)}`) ?? u.orgCode.slice(6, 8),
-      } : null;
-
-      return {
-        id: u.id,
-        firstName: u.firstName,
-        lastName: u.lastName,
-        email: u.email,
-        personalNumber: u.personalNumber,
-        role: u.role,
-        orgCode: u.orgCode,
-        orgNames,
-      };
+    const byLevelCode = new Map(allMappings.map((m) => [`${m.level}:${m.code}`, m.textValue]));
+    const resolve = (orgCode: string) => ({
+      unit: byLevelCode.get(`unit:${orgCode.substring(0, 2)}`) ?? orgCode.substring(0, 2),
+      anaf: byLevelCode.get(`anaf:${orgCode.substring(2, 4)}`) ?? orgCode.substring(2, 4),
+      mador: byLevelCode.get(`mador:${orgCode.substring(4, 6)}`) ?? orgCode.substring(4, 6),
+      team: byLevelCode.get(`team:${orgCode.substring(6, 8)}`) ?? orgCode.substring(6, 8),
     });
+
+    return users.map((u) => ({
+      id: u.id,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      email: u.email,
+      personalNumber: u.personalNumber,
+      role: u.role,
+      orgCode: u.orgCode,
+      orgNames: u.orgCode?.length === 8 ? resolve(u.orgCode) : null,
+    }));
   }
 
   async setUserRole(targetUserId: string, newRole: Exclude<UserRole, 'admin'>): Promise<void> {
