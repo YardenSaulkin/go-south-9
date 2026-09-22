@@ -6,19 +6,20 @@ import {
   ToggleButton,
   Paper,
   Avatar,
+  Chip,
   createTheme,
   ThemeProvider,
 } from '@mui/material'
-import { Package, Truck, PackageOpen, LayoutGrid, type LucideIcon } from 'lucide-react'
+import { Package, Truck, PackageOpen, LayoutGrid, Users, BarChart3, type LucideIcon } from 'lucide-react'
 
 interface User {
   name: string
   personalNumber?: string
-  role?: string
+  role?: 'admin' | 'poc' | 'normal'
 }
 
 type TabValue = 'sending' | 'receiving'
-type NavigateRoute = 'packing' | 'transport' | 'receiving' | 'distribution'
+type NavigateRoute = 'packing' | 'transport' | 'receiving' | 'distribution' | 'admin' | 'poc'
 
 interface ActionCardItem {
   label: string
@@ -41,6 +42,20 @@ const RECEIVING_CARDS: ActionCardItem[] = [
   { label: 'פיזור ציוד', route: 'distribution', Icon: LayoutGrid },
 ]
 
+const ADMIN_CARDS: ActionCardItem[] = [
+  { label: 'ניהול משתמשים', route: 'admin', Icon: Users },
+]
+
+const POC_CARDS: ActionCardItem[] = [
+  { label: 'דשבורד קישור', route: 'poc', Icon: BarChart3 },
+]
+
+const ROLE_LABEL: Record<string, string> = {
+  admin: 'מנהל',
+  poc: 'קצין קישור',
+  normal: 'משתמש',
+}
+
 const theme = createTheme({
   direction: 'rtl',
   typography: { fontFamily: 'Heebo, sans-serif' },
@@ -61,7 +76,11 @@ export default function LogisticsMainMenu({ user, onNavigate }: MainMenuProps) {
   const [activeTab, setActiveTab] = useState<TabValue>('sending')
   const [animKey, setAnimKey] = useState(0)
 
-  const cards = activeTab === 'sending' ? SENDING_CARDS : RECEIVING_CARDS
+  const roleLabel = user.role ? (ROLE_LABEL[user.role] ?? user.role) : null
+
+  const baseCards = activeTab === 'sending' ? SENDING_CARDS : RECEIVING_CARDS
+  const roleCards = user.role === 'admin' ? ADMIN_CARDS : user.role === 'poc' ? POC_CARDS : []
+  const cards = [...roleCards, ...baseCards]
 
   const handleTabChange = (_: React.MouseEvent<HTMLElement>, val: TabValue | null) => {
     if (val && val !== activeTab) {
@@ -123,19 +142,39 @@ export default function LogisticsMainMenu({ user, onNavigate }: MainMenuProps) {
               gap: 1.5,
             }}
           >
-            <Typography
-              sx={{
-                color: 'white',
-                fontWeight: 700,
-                fontFamily: 'Heebo, sans-serif',
-                textShadow: '0 1px 6px rgba(0,0,0,0.5)',
-                textAlign: 'right',
-                fontSize: '1.15rem',
-                lineHeight: 1.4,
-              }}
-            >
-              שלום {user.name}, מה תרצה לעשות?
-            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.5 }}>
+              <Typography
+                sx={{
+                  color: 'white',
+                  fontWeight: 700,
+                  fontFamily: 'Heebo, sans-serif',
+                  textShadow: '0 1px 6px rgba(0,0,0,0.5)',
+                  textAlign: 'right',
+                  fontSize: '1.15rem',
+                  lineHeight: 1.4,
+                }}
+              >
+                שלום {user.name}, מה תרצה לעשות?
+              </Typography>
+              {roleLabel && (
+                <Chip
+                  label={roleLabel}
+                  size="small"
+                  sx={{
+                    fontFamily: 'Heebo, sans-serif',
+                    fontWeight: 600,
+                    bgcolor: user.role === 'admin'
+                      ? 'rgba(211,47,47,0.85)'
+                      : user.role === 'poc'
+                        ? 'rgba(245,124,0,0.85)'
+                        : 'rgba(76,175,80,0.85)',
+                    color: 'white',
+                    backdropFilter: 'blur(4px)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                  }}
+                />
+              )}
+            </Box>
             <Avatar
               sx={{
                 width: 40,
