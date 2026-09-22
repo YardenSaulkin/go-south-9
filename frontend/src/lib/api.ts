@@ -7,7 +7,7 @@ function headers(userId: string) {
 export interface DemoUser {
   id: string
   email: string
-  role: string
+  role: 'admin' | 'poc' | 'normal'
   orgScopeId: string | null
   orgCode: string | null
   firstName?: string | null

@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -77,10 +78,13 @@ export class PocService {
           }
         }
 
-        await tx.shipment.update({
-          where: { id: shipmentId },
+        const updatedShipment = await tx.shipment.updateMany({
+          where: { id: shipmentId, status: ShipmentStatus.arrived },
           data: { status: ShipmentStatus.verified },
         });
+        if (updatedShipment.count !== 1) {
+          throw new ConflictException('ההובלה כבר אומתה או שונתה. יש לרענן.');
+        }
 
         await tx.operationEvent.create({
           data: {

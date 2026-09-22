@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { OrgHierarchyLevel, Prisma } from '@prisma/client';
 import { db } from '../lib/db.js';
 
@@ -19,6 +19,9 @@ export class OrgHierarchyService {
           orderBy: { code: 'desc' },
         });
         const next = maxEntry ? parseInt(maxEntry.code, 10) + 1 : 1;
+        if (next > 99) {
+          throw new BadRequestException(`org hierarchy level '${level}' is full (max 99 entries)`);
+        }
         const code = String(next).padStart(2, '0');
 
         const created = await tx.orgHierarchyMapping.create({
