@@ -37,7 +37,7 @@ export default function HomePage() {
           <LogIn size={24} />
           התחברות
         </Button>
-        
+
         <Button
           variant="contained"
           fullWidth

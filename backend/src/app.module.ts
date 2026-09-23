@@ -9,6 +9,7 @@ import { PocController } from './controllers/poc.controller.js';
 import { ContextController } from './controllers/context.controller.js';
 import { StatusController } from './controllers/status.controller.js';
 import { DashboardController } from './controllers/dashboard.controller.js';
+import { DestinationController } from './controllers/destination.controller.js';
 import { DistributionController } from './controllers/distribution.controller.js';
 import { PackingController } from './controllers/packing.controller.js';
 import { ReceivingController } from './controllers/receiving.controller.js';
@@ -17,6 +18,7 @@ import { AdminService } from './services/admin.service.js';
 import { PocService } from './services/poc.service.js';
 import { AuthService } from './services/auth.service.js';
 import { DashboardService } from './services/dashboard.service.js';
+import { DestinationService } from './services/destination.service.js';
 import { DistributionService } from './services/distribution.service.js';
 import { PackingService } from './services/packing.service.js';
 import { ReceivingService } from './services/receiving.service.js';
@@ -49,6 +51,7 @@ const observeAppSecret = process.env.OBSERVE_APP_SECRET;
     AdminController,
     AuthController,
     ContextController,
+    DestinationController,
     PackingController,
     ShipmentController,
     ReceivingController,
@@ -61,6 +64,7 @@ const observeAppSecret = process.env.OBSERVE_APP_SECRET;
     AppService,
     AdminService,
     AuthService,
+    DestinationService,
     CurrentUserService,
     PackingService,
     ShipmentService,

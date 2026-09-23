@@ -11,12 +11,16 @@ import PocDashboardPage from "./pages/PocDashboardPage";
 import ShipmentsStatusPage from "./pages/ShipmentsStatusPage";
 import PackingUnitsStatusPage from "./pages/PackingUnitsStatusPage";
 import { navigate, usePathname } from "./navigation";
-import PackingUnitPage from "./components/PackingUnitPage";
+import PackingUnitPage, {
+  PackingSuccessScreen,
+  type PackingDraft,
+} from "./components/PackingUnitPage";
 import ShipmentPage from "./components/ShipmentPage";
 import DistributionPage from "./components/DistributionPage";
 import ReceivingPage from "./components/ReceivingPage";
 import { useCurrentUser } from "./auth/useCurrentUser";
 import { clearCurrentUser, userDisplayName } from "./auth/session";
+import type { PackingSuccessResponse } from "./api/packing";
 
 // Routes that manage their own bottom navbar (or need none)
 const NO_NAVBAR_ROUTES = ["/home", "/login", "/signup"];
@@ -31,10 +35,15 @@ type NavigateRoute =
 
 const PUBLIC_ROUTES = ["/home", "/login", "/signup"];
 
+const FALLBACK_USER = { name: "דני", personalNumber: "1234567", role: "מפקד" };
+
 export default function App() {
   const pathname = usePathname();
   const user = useCurrentUser();
   const [menuTab, setMenuTab] = useState<"sending" | "receiving">("sending");
+  const [packingSuccess, setPackingSuccess] =
+    useState<PackingSuccessResponse | null>(null);
+  const [packingDraft, setPackingDraft] = useState<PackingDraft | null>(null);
 
   useEffect(() => {
     if (pathname === "/") {
@@ -51,16 +60,16 @@ export default function App() {
   const handleNavigate = (route: NavigateRoute) => {
     if (route === "packing") navigate("/packing");
     else if (route === "transport") navigate("/transport");
-    else if (route === "distribution") navigate("/distribution");
-    else if (route === "receiving") navigate("/receiving");
     else if (route === "admin") navigate("/admin/users");
     else if (route === "poc") navigate("/poc/dashboard");
+    else console.log("navigate ->", route);
   };
-
   const handleBack = () => navigate("/menu");
 
   const handleLogout = () => {
     clearCurrentUser();
+    setPackingDraft(null);
+    setPackingSuccess(null);
     navigate("/home");
   };
 
@@ -87,11 +96,48 @@ export default function App() {
     page = <ShipmentsStatusPage userId={user.id} />;
   else if (pathname === "/status/packing-units")
     page = <PackingUnitsStatusPage userId={user.id} />;
-  else if (pathname === "/packing")
-    page = (
+  else if (pathname === "/packing/success" && packingSuccess) {
+    return (
+      <PackingSuccessScreen
+        response={packingSuccess}
+        onContinue={() => {
+          setPackingDraft({
+            orgScopeId: packingSuccess.source.orgScopeId,
+            unit: packingSuccess.source.unit ?? "",
+            anaf: packingSuccess.source.anaf ?? "",
+            mador: packingSuccess.source.mador ?? "",
+            team: packingSuccess.source.team ?? "",
+            roomId: packingSuccess.source.roomId ?? "",
+            building: packingSuccess.destination.building ?? "",
+            floor: packingSuccess.destination.floor ?? "",
+            destinationRoom: packingSuccess.destination.room ?? "",
+            sourceDescription: packingSuccess.source.description ?? "",
+            destinationDescription:
+              packingSuccess.destination.description ?? "",
+            destinationMode: "existing",
+            destinationId: packingSuccess.destination.id ?? "",
+          });
+          setPackingSuccess(null);
+          navigate("/packing");
+        }}
+        onHome={() => {
+          setPackingDraft(null);
+          setPackingSuccess(null);
+          navigate("/home");
+        }}
+      />
+    );
+  } else if (pathname === "/packing")
+    return (
       <PackingUnitPage
+        key={packingDraft ? "retained-packing" : "new-packing"}
+        initialDraft={packingDraft}
         onBack={handleBack}
-        orgScope={{ mador: user.orgCode?.substring(4, 6) }}
+        onComplete={(response, draft) => {
+          setPackingDraft(draft);
+          setPackingSuccess(response);
+          navigate("/packing/success");
+        }}
       />
     );
   else if (pathname === "/distribution")
