@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { Box } from '@mui/material'
+import AppLogo from './components/AppLogo'
 import LogisticsMainMenu from './components/LogisticsMainMenu'
 import BottomNavBar from './components/BottomNavBar'
 import HomePage from './pages/HomePage'
@@ -28,7 +29,9 @@ export default function App() {
   const user = useCurrentUser()
 
   useEffect(() => {
-    if (pathname === '/') navigate('/home', { replace: true })
+    if (pathname === '/') {
+      navigate('/home', { replace: true })
+    }
   }, [])
 
   useEffect(() => {
@@ -44,7 +47,6 @@ export default function App() {
     else if (route === 'receiving') navigate('/receiving')
     else if (route === 'admin') navigate('/admin/users')
     else if (route === 'poc') navigate('/poc/dashboard')
-    else console.log('navigate ->', route)
   }
 
   const handleBack = () => navigate('/menu')
@@ -75,11 +77,14 @@ export default function App() {
   else if (pathname === '/transport') page = <ShipmentPage onBack={handleBack} userId={user.id} orgScopeId={user.orgScopeId} />
   else if (pathname === '/receiving') page = <ReceivingPage userId={user.id} onExit={handleBack} onNavigate={handleNavigate} />
   else page = (
-    <LogisticsMainMenu
-      user={{ name: userDisplayName(user), personalNumber: user.personalNumber ?? undefined, role: user.role }}
-      onNavigate={handleNavigate}
-      onLogout={handleLogout}
-    />
+    <>
+      <AppLogo />
+      <LogisticsMainMenu
+        user={{ name: userDisplayName(user), personalNumber: user.personalNumber ?? undefined, role: user.role }}
+        onNavigate={handleNavigate}
+        onLogout={handleLogout}
+      />
+    </>
   )
 
   return (
