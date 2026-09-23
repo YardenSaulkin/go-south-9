@@ -14,6 +14,7 @@ import {
   createTheme,
   ThemeProvider,
 } from "@mui/material";
+import { alignWithLogo } from "./AppLogo";
 import {
   Package,
   Truck,
@@ -75,6 +76,9 @@ const ROLE_LABEL: Record<string, string> = {
   poc: "קצין קישור",
   normal: "משתמש",
 };
+
+// Kept in sync with the Avatar's width/height so it can be centred on the logo.
+const AVATAR_SIZE = 40;
 
 const theme = createTheme({
   direction: "rtl",
@@ -159,7 +163,8 @@ export default function LogisticsMainMenu({
             width: "100%",
             flexGrow: 1,
             px: "5vw",
-            pt: "6vh",
+            // Puts the first row — the avatar — level with the fixed AppLogo.
+            pt: alignWithLogo(AVATAR_SIZE),
             pb: "4vh",
             gap: "2vh",
           }}
@@ -179,8 +184,8 @@ export default function LogisticsMainMenu({
               onClick={(e) => setMenuAnchor(e.currentTarget)}
               aria-label="תפריט משתמש"
               sx={{
-                width: 40,
-                height: 40,
+                width: AVATAR_SIZE,
+                height: AVATAR_SIZE,
                 flexShrink: 0,
                 cursor: "pointer",
                 WebkitTapHighlightColor: "transparent",
