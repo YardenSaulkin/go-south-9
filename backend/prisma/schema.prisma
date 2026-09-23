@@ -15,27 +15,6 @@ enum OrgScopeLevel {
   @@map("org_scope_level")
 }
 
-enum OrgHierarchyLevel {
-  unit
-  anaf
-  mador
-  team
-
-  @@map("org_hierarchy_level")
-}
-
-model OrgHierarchyMapping {
-  id        String            @id @default(uuid()) @db.Uuid
-  level     OrgHierarchyLevel
-  textValue String            @map("text_value")
-  code      String            @db.Char(2)
-  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  @@unique([level, textValue])
-  @@unique([level, code])
-  @@map("org_hierarchy_mappings")
-}
-
 enum UserRole {
   admin
   poc
@@ -109,10 +88,7 @@ enum DiscrepancyStatus {
 model OrgScope {
   id          String        @id @default(uuid()) @db.Uuid
   scopeLevel  OrgScopeLevel @map("scope_level")
-  unit        String?
-  anaf        String?
   mador       String
-  team        String?
   orgCode     String?       @map("org_code") @db.Char(8)
   description String?
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -122,28 +98,7 @@ model OrgScope {
   shipments    Shipment[]
   packingUnits PackingUnit[]
   items        Item[]
-  destinations Destination[]
-
   @@map("org_scopes")
-}
-
-model Destination {
-  id              String   @id @default(uuid()) @db.Uuid
-  destinationCode String   @unique @map("destination_code")
-  description     String
-  building        String
-  floor           String
-  room            String
-  orgScopeId      String   @map("org_scope_id") @db.Uuid
-  createdByUserId String   @map("created_by_user_id") @db.Uuid
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  orgScope  OrgScope @relation(fields: [orgScopeId], references: [id])
-  createdBy User     @relation("DestinationCreator", fields: [createdByUserId], references: [id])
-
-  @@index([orgScopeId, description])
-  @@map("destinations")
 }
 
 model User {
@@ -172,8 +127,6 @@ model User {
   finalizedDiscrepancies Discrepancy[]      @relation("DiscrepancyFinalizer")
   operationRequests      OperationRequest[]
   operationEvents        OperationEvent[]
-  createdDestinations    Destination[]      @relation("DestinationCreator")
-
   @@map("users")
 }
 
@@ -214,12 +167,6 @@ model PackingUnit {
   destinationDescription String?           @map("destination_description")
   sourceRoomId           String?           @map("source_room_id")
   destinationRoomId      String?           @map("destination_room_id")
-  destinationBuilding    String?           @map("destination_building")
-  destinationFloor       String?           @map("destination_floor")
-  sourceRoomResponsibleName  String?       @map("source_room_responsible_name")
-  sourceRoomResponsiblePhone String?      @map("source_room_responsible_phone")
-  sourceMadorResponsibleName String?      @map("source_mador_responsible_name")
-  sourceMadorResponsiblePhone String?     @map("source_mador_responsible_phone")
   orgScopeId             String            @map("org_scope_id") @db.Uuid
   ownerUserId            String?           @map("owner_user_id") @db.Uuid
   createdByUserId        String            @map("created_by_user_id") @db.Uuid

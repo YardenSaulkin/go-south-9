@@ -12,6 +12,9 @@ describe('room-based packing-item visibility', () => {
       orgScopeId: '123e4567-e89b-12d3-a456-426614174000',
       sourceRoomId: 'Room 100',
       packingUnitId: null,
+      status: 'not_sent',
+      sourceMappingReportId: { not: '' },
+      quantity: { gt: 0 },
     });
     expect(where).not.toHaveProperty('ownerUserId');
     expect(where).not.toHaveProperty('createdByUserId');

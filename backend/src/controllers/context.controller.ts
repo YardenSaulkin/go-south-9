@@ -12,7 +12,7 @@ export class ContextController {
   async getContext(@Headers('x-user-id') userId: string | undefined) {
     const user = await this.currentUsers.require(userId);
     const scopes = await db.orgScope.findMany({
-      orderBy: [{ orgCode: 'asc' }, { unit: 'asc' }, { anaf: 'asc' }, { mador: 'asc' }, { team: 'asc' }],
+      orderBy: [{ orgCode: 'asc' }, { mador: 'asc' }],
     });
 
     return {

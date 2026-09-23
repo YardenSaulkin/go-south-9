@@ -27,7 +27,7 @@ export function mappingStatusFromProvenance(
   const mapped = mappedItemCount > 0;
   return {
     roomId,
-    exists: mapped,
+    exists: true,
     completed: mapped,
     source: 'mapping_report_provenance',
   };

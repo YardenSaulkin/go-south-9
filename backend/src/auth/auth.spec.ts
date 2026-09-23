@@ -26,9 +26,8 @@ vi.mock('../lib/db.js', () => ({
 
 import { loginSchema } from './auth.schemas.js';
 import { AuthService } from '../services/auth.service.js';
-import type { OrgHierarchyService } from '../services/org-hierarchy.service.js';
 
-const authService = () => new AuthService({} as OrgHierarchyService);
+const authService = () => new AuthService();
 
 const persistedUser = {
   id: '123e4567-e89b-12d3-a456-426614174000',
@@ -42,14 +41,6 @@ const persistedUser = {
   createdByUserId: null,
   createdAt: new Date('2026-09-22T00:00:00.000Z'),
   updatedAt: new Date('2026-09-22T00:00:00.000Z'),
-  orgScope: {
-    id: '123e4567-e89b-12d3-a456-426614174001',
-    unit: 'יחידה א',
-    anaf: 'ענף א',
-    mador: 'מדור א',
-    team: 'צוות א',
-    orgCode: '12345678',
-  },
 };
 
 describe('authentication regression', () => {

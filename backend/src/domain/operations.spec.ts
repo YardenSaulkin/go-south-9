@@ -117,7 +117,10 @@ describe('operational domain rules', () => {
       completed: true,
       source: 'mapping_report_provenance',
     });
-    expect(mappingStatusFromProvenance('room-2', 0).exists).toBe(false);
+    expect(mappingStatusFromProvenance('room-2', 0)).toMatchObject({
+      exists: true,
+      completed: false,
+    });
     expect(mappingStatusFromProvenance(undefined, 0).source).toBe('not_selected');
   });
 
@@ -129,6 +132,7 @@ describe('operational domain rules', () => {
       sourceRoomId: 'חדר 1',
       destination: {
         mode: 'new' as const,
+        destinationId: 'DEST-200',
         description: 'יעד בדיקה',
         building: 'א',
         floor: '1',
@@ -153,7 +157,6 @@ describe('operational domain rules', () => {
     const withOptionalDescriptions = createPackingUnitSchema.safeParse({
       ...base,
       description: 'קרטון אישי עם ציוד אישי',
-      sourceDescription: 'מדף עליון ליד הכניסה',
       destination: {
         ...base.destination,
         description: 'להניח בחדר הקליטה',

@@ -7,7 +7,6 @@ import { OrgScopeLevel, UserRole } from '@prisma/client';
 import type { User } from '@prisma/client';
 import { db } from '../lib/db.js';
 import type { LoginInput, SignupInput } from '../auth/auth.schemas.js';
-import { OrgHierarchyService } from './org-hierarchy.service.js';
 
 // The app identifies the caller by the `x-user-id` header (see
 // CurrentUserService). Sign-up and login therefore return the user record, and
@@ -38,8 +37,6 @@ function toAuthenticatedUser(user: User): AuthenticatedUser {
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly orgHierarchy: OrgHierarchyService) {}
-
   async signup(input: SignupInput): Promise<AuthenticatedUser> {
     const [existingByPersonalNumber, existingByEmail] = await Promise.all([
       db.user.findUnique({ where: { personalNumber: input.personalNumber } }),
@@ -55,14 +52,9 @@ export class AuthService {
       throw new ConflictException('כתובת אימייל זו כבר רשומה במערכת');
     }
 
-    const orgCode = await this.orgHierarchy.computeOrgCode(
-      input.unit,
-      input.anaf,
-      input.mador,
-      input.team,
-    );
+    const orgCode = `${input.unit}${input.anaf}${input.mador}${input.team}`;
 
-    const orgScope = await this.findOrCreateOrgScope(input, orgCode);
+    const orgScope = await this.findOrCreateOrgScope(input.mador, orgCode);
 
     const user = await db.user.create({
       data: {
@@ -95,17 +87,14 @@ export class AuthService {
 
   // Users must belong to an org scope, otherwise the user_access_profiles view
   // resolves no mador and the operations endpoints reject them.
-  private async findOrCreateOrgScope(input: SignupInput, orgCode: string) {
+  private async findOrCreateOrgScope(mador: string, orgCode: string) {
     const existing = await db.orgScope.findFirst({ where: { orgCode } });
     if (existing) return existing;
 
     return db.orgScope.create({
       data: {
         scopeLevel: OrgScopeLevel.team,
-        unit: input.unit,
-        anaf: input.anaf,
-        mador: input.mador,
-        team: input.team,
+        mador,
         orgCode,
       },
     });

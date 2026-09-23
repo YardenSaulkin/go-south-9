@@ -10,13 +10,11 @@ import PackingUnitPage, { PackingSuccessScreen, type PackingDraft } from './comp
 import ShipmentPage from './components/ShipmentPage'
 import { useCurrentUser } from './auth/useCurrentUser'
 import { clearCurrentUser, userDisplayName } from './auth/session'
-import type { PackingSuccessResponse } from './lib/api'
+import type { PackingSuccessResponse } from './api/packing'
 
 type NavigateRoute = 'packing' | 'transport' | 'receiving' | 'distribution' | 'admin' | 'poc'
 
 const PUBLIC_ROUTES = ['/home', '/login', '/signup']
-
-const FALLBACK_USER = { name: 'דני', personalNumber: '1234567', role: 'מפקד' }
 
 export default function App() {
   const pathname = usePathname()
@@ -76,15 +74,14 @@ export default function App() {
           anaf: packingSuccess.source.anaf ?? '',
           mador: packingSuccess.source.mador ?? '',
           team: packingSuccess.source.team ?? '',
-          roomId: packingSuccess.source.room ?? '',
-          building: packingSuccess.destination.building,
-          floor: packingSuccess.destination.floor,
-          destinationRoom: packingSuccess.destination.room,
-          sourceDescription: packingSuccess.source.sourceDescription ?? '',
+          roomId: packingSuccess.source.roomId ?? '',
+          building: packingSuccess.destination.building ?? '',
+          floor: packingSuccess.destination.floor ?? '',
+          destinationRoom: packingSuccess.destination.room ?? '',
+          sourceDescription: packingSuccess.source.description ?? '',
           destinationDescription: packingSuccess.destination.description ?? '',
           destinationMode: 'existing',
           destinationId: packingSuccess.destination.id ?? '',
-          destinationCode: packingSuccess.destination.code,
         })
         setPackingSuccess(null)
         navigate('/packing')
@@ -99,7 +96,6 @@ export default function App() {
   if (pathname === '/packing') return <PackingUnitPage
     key={packingDraft ? 'retained-packing' : 'new-packing'}
     initialDraft={packingDraft}
-    authenticatedUserId={user.id}
     onBack={handleBack}
     onComplete={(response, draft) => { setPackingDraft(draft); setPackingSuccess(response); navigate('/packing/success') }}
   />

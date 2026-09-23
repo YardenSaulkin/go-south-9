@@ -16,9 +16,19 @@ export class DestinationController {
     @Headers('x-user-id') userId: string | undefined,
     @Query('orgScopeId') orgScopeId: string,
     @Query('search') search?: string,
+    @Query('sourceRoomId') sourceRoomId?: string,
   ) {
     const user = await this.users.require(userId);
-    const input = parseOrThrow(destinationSearchSchema, { orgScopeId, search });
-    return this.destinations.search(user, input.orgScopeId, input.search);
+    const input = parseOrThrow(destinationSearchSchema, {
+      orgScopeId,
+      search,
+      sourceRoomId,
+    });
+    return this.destinations.search(
+      user,
+      input.orgScopeId,
+      input.search,
+      input.sourceRoomId,
+    );
   }
 }

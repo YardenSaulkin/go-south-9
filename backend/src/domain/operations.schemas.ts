@@ -18,8 +18,7 @@ export const createPackingUnitSchema = z
     description: z.string().trim().max(1000),
     packingUnitType: z.nativeEnum(PackingUnitType),
     sourceRoomId: z.string().trim().min(1, 'יש לבחור חדר מקור').max(200),
-    sourceDescription: z.string().trim().max(1000).optional(),
-    destination: destinationSchema,
+    destination: destinationSelectionSchema,
     items: z
       .array(
         z.object({

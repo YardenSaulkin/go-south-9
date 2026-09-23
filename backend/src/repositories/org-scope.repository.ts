@@ -10,14 +10,14 @@ export class OrgScopeRepository {
 
   list() {
     return this.client.orgScope.findMany({
-      orderBy: [{ mador: 'asc' }, { team: 'asc' }],
+      orderBy: [{ mador: 'asc' }, { orgCode: 'asc' }],
     });
   }
 
   listByMador(mador: string) {
     return this.client.orgScope.findMany({
       where: { mador },
-      orderBy: { team: 'asc' },
+      orderBy: { orgCode: 'asc' },
     });
   }
 }

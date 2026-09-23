@@ -31,13 +31,7 @@ CREATE SEQUENCE IF NOT EXISTS packing_unit_serial_number_seq START WITH 1;
 ALTER TABLE packing_units
   ADD COLUMN IF NOT EXISTS packing_unit_type packing_unit_type,
   ADD COLUMN IF NOT EXISTS serial_number integer DEFAULT nextval('packing_unit_serial_number_seq'),
-  ADD COLUMN IF NOT EXISTS idempotency_key text,
-  ADD COLUMN IF NOT EXISTS destination_building text,
-  ADD COLUMN IF NOT EXISTS destination_floor text,
-  ADD COLUMN IF NOT EXISTS source_room_responsible_name text,
-  ADD COLUMN IF NOT EXISTS source_room_responsible_phone text,
-  ADD COLUMN IF NOT EXISTS source_mador_responsible_name text,
-  ADD COLUMN IF NOT EXISTS source_mador_responsible_phone text;
+  ADD COLUMN IF NOT EXISTS idempotency_key text;
 
 ALTER SEQUENCE packing_unit_serial_number_seq OWNED BY packing_units.serial_number;
 
@@ -59,8 +53,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS shipments_idempotency_key_key
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS first_name text,
   ADD COLUMN IF NOT EXISTS last_name text,
-  ADD COLUMN IF NOT EXISTS personal_number text,
-  ADD COLUMN IF NOT EXISTS phone text;
+  ADD COLUMN IF NOT EXISTS personal_number text;
 
 ALTER TABLE items
   ADD COLUMN IF NOT EXISTS quantity integer NOT NULL DEFAULT 1,
