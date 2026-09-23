@@ -72,6 +72,8 @@ export default function App() {
     else if (route === "transport") navigate("/transport");
     else if (route === "admin") navigate("/admin/users");
     else if (route === "poc") navigate("/poc/dashboard");
+    else if (route === "receiving") navigate("/receiving");
+    else if (route === "distribution") navigate("/distribution");
     else console.log("navigate ->", route);
   };
   const handleBack = () => navigate("/menu");
