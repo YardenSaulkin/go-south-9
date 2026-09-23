@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Box } from '@mui/material'
 import AppLogo from './components/AppLogo'
 import LogisticsMainMenu from './components/LogisticsMainMenu'
@@ -18,7 +18,13 @@ import ReceivingPage from './components/ReceivingPage'
 import { useCurrentUser } from './auth/useCurrentUser'
 import { clearCurrentUser, userDisplayName } from './auth/session'
 
-const NO_NAVBAR_ROUTES = ['/home', '/login', '/signup']
+// Routes that manage their own bottom navbar (or need none)
+const NO_NAVBAR_ROUTES = [
+  '/home', '/login', '/signup',
+  '/packing', '/transport',
+  '/receiving', '/distribution',
+  '/status/shipments', '/status/packing-units',
+]
 
 type NavigateRoute = 'packing' | 'transport' | 'receiving' | 'distribution' | 'admin' | 'poc'
 
@@ -27,6 +33,7 @@ const PUBLIC_ROUTES = ['/home', '/login', '/signup']
 export default function App() {
   const pathname = usePathname()
   const user = useCurrentUser()
+  const [menuTab, setMenuTab] = useState<'sending' | 'receiving'>('sending')
 
   useEffect(() => {
     if (pathname === '/') {
@@ -77,6 +84,7 @@ export default function App() {
   else if (pathname === '/transport') page = <ShipmentPage onBack={handleBack} userId={user.id} orgScopeId={user.orgScopeId} />
   else if (pathname === '/receiving') page = <ReceivingPage userId={user.id} onExit={handleBack} onNavigate={handleNavigate} />
   else page = (
+<<<<<<< Updated upstream
     <>
       <AppLogo />
       <LogisticsMainMenu
@@ -85,6 +93,15 @@ export default function App() {
         onLogout={handleLogout}
       />
     </>
+=======
+    <LogisticsMainMenu
+      user={{ name: userDisplayName(user), personalNumber: user.personalNumber ?? undefined, role: user.role }}
+      onNavigate={handleNavigate}
+      onLogout={handleLogout}
+      activeTab={menuTab}
+      onTabChange={setMenuTab}
+    />
+>>>>>>> Stashed changes
   )
 
   return (
