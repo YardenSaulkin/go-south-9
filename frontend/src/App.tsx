@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import AppLogo from './components/AppLogo'
 import LogisticsMainMenu from './components/LogisticsMainMenu'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
@@ -9,6 +8,7 @@ import PocDashboardPage from './pages/PocDashboardPage'
 import { navigate, usePathname } from './navigation'
 import PackingUnitPage from './components/PackingUnitPage'
 import ShipmentPage from './components/ShipmentPage'
+import DistributionPage from './components/DistributionPage'
 import ReceivingPage from './components/ReceivingPage'
 import { useCurrentUser } from './auth/useCurrentUser'
 import { clearCurrentUser, userDisplayName } from './auth/session'
@@ -34,6 +34,7 @@ export default function App() {
   const handleNavigate = (route: NavigateRoute) => {
     if (route === 'packing') navigate('/packing')
     else if (route === 'transport') navigate('/transport')
+    else if (route === 'distribution') navigate('/distribution')
     else if (route === 'receiving') navigate('/receiving')
     else if (route === 'admin') navigate('/admin/users')
     else if (route === 'poc') navigate('/poc/dashboard')
@@ -47,41 +48,52 @@ export default function App() {
     navigate('/home')
   }
 
-  const renderRoute = () => {
-    if (pathname === '/home') return <HomePage />
-    if (pathname === '/login') return <LoginPage />
-    if (pathname === '/signup') return <SignUpPage />
-    if (pathname === '/packing') return <PackingUnitPage onBack={handleBack} />
-    if (pathname === '/receiving')
-      return (
-        <ReceivingPage
-          userId={user.id}
-          onExit={handleBack}
-          onNavigate={handleNavigate}
-        />
-      )
-    if (pathname === '/transport')
-      return <ShipmentPage onBack={handleBack} userId={user.id} orgScopeId={user.orgScopeId} />
-    if (pathname === '/poc/dashboard') return <PocDashboardPage userId={user.id} onBack={handleBack} />
-    if (pathname === '/admin/users') return <AdminUsersPage userId={user.id} onBack={handleBack} />
-
+  if (pathname === '/home') return <HomePage />
+  if (pathname === '/login') return <LoginPage />
+  if (pathname === '/signup') return <SignUpPage />
+  if (pathname === '/admin/users') return <AdminUsersPage userId={user?.id ?? null} />
+  if (pathname === '/poc/dashboard') return <PocDashboardPage userId={user?.id ?? null} />
+  if (pathname === '/packing') return <PackingUnitPage onBack={handleBack} />
+  if (pathname === '/distribution')
     return (
-      <LogisticsMainMenu
-        user={{
-          name: userDisplayName(user),
-          personalNumber: user.personalNumber ?? undefined,
-          role: user.role,
-        }}
-        onNavigate={handleNavigate}
-        onLogout={handleLogout}
+      <DistributionPage
+        onBack={handleBack}
+        userId={user?.id ?? null}
+        orgScopeId={user?.orgScopeId ?? null}
       />
     )
-  }
+  if (pathname === '/transport')
+    return (
+      <ShipmentPage
+        onBack={handleBack}
+        userId={user?.id ?? null}
+        orgScopeId={user?.orgScopeId ?? null}
+      />
+    )
+
+  if (!user) return <HomePage />
+  if (pathname === '/receiving')
+    return (
+      <ReceivingPage
+        userId={user.id}
+        onExit={handleBack}
+        onNavigate={handleNavigate}
+      />
+    )
+  if (pathname === '/transport')
+    return <ShipmentPage onBack={handleBack} userId={user.id} orgScopeId={user.orgScopeId} />
+  if (pathname === '/poc/dashboard') return <PocDashboardPage userId={user.id} onBack={handleBack} />
+  if (pathname === '/admin/users') return <AdminUsersPage userId={user.id} onBack={handleBack} />  
 
   return (
-    <>
-      <AppLogo />
-      {renderRoute()}
-    </>
+    <LogisticsMainMenu
+      user={{
+        name: userDisplayName(user),
+        personalNumber: user.personalNumber ?? undefined,
+        role: user.role,
+      }}
+      onNavigate={handleNavigate}
+      onLogout={handleLogout}
+    />
   )
 }
