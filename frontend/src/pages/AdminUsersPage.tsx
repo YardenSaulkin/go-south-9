@@ -112,9 +112,9 @@ export default function AdminUsersPage({ userId }: Props) {
                 <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontSize: '0.82rem', color: '#666', mb: 0.5 }}>
                   {user.personalNumber ?? '—'} · {user.email}
                 </Typography>
-                {/* Row 3: unit */}
+                {/* Row 3: org code */}
                 <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontSize: '0.82rem', color: '#666', mb: user.role !== 'admin' ? 1 : 0 }}>
-                  {user.orgNames?.unit ?? user.orgCode?.substring(0, 2) ?? '—'}
+                  {user.orgCode ?? '—'}
                 </Typography>
                 {/* Row 4: action button */}
                 {user.role !== 'admin' && (

@@ -18,9 +18,6 @@ export interface DemoUser {
 export interface OrgScope {
   id: string
   mador: string
-  unit: string | null
-  anaf: string | null
-  team: string | null
   description: string | null
 }
 
@@ -155,7 +152,6 @@ export interface AdminUserView {
   personalNumber: string | null
   role: 'admin' | 'poc' | 'normal'
   orgCode: string | null
-  orgNames: { unit: string; anaf: string; mador: string; team: string } | null
 }
 
 export interface PocShipment {
@@ -177,6 +173,7 @@ export interface PocDashboard {
   shipments: PocShipment[]
   pending: PocShipment[]
   verified: PocShipment[]
+  unitNames?: Record<string, string>
 }
 
 export async function fetchAdminUsers(userId: string): Promise<AdminUserView[]> {
@@ -355,3 +352,75 @@ export async function distributePackingUnit(
   return res.json()
 }
 
+// ─── Receiving (קבלת ציוד) ─────────────────────────────────────────────────
+
+export type PackingUnitStatus =
+  | 'not_sent'
+  | 'assigned_to_shipment'
+  | 'in_transit'
+  | 'arrived_pending_verification'
+  | 'verified'
+
+export interface ReceivingPackingUnit {
+  id: string
+  description: string
+  status: PackingUnitStatus
+  serialNumber: number | null
+  displaySerial: string | null
+  packingUnitType: string | null
+  sourceDescription: string | null
+  destinationDescription: string | null
+  items: { id: string; description: string; quantity: number; status: string }[]
+}
+
+export interface ReceivingShipment {
+  id: string
+  description: string
+  status: string
+  vehicleIdentifier: string | null
+  transportType: string | null
+  transportDescription: string | null
+  transportAt: string | null
+  sourceDescription: string | null
+  destinationDescription: string | null
+  packingUnits: ReceivingPackingUnit[]
+}
+
+// What the backend reports after a receiving pass: the shipment as it now
+// stands, plus whatever is still unaccounted for.
+export interface ReceivingResult {
+  shipment: ReceivingShipment
+  shipmentStatus: string
+  expectedCount: number
+  receivedCount: number
+  missingCount: number
+  remainingPackingUnits: ReceivingPackingUnit[]
+  finalized: boolean
+}
+
+export async function fetchReceivingShipments(
+  userId: string,
+): Promise<ReceivingShipment[]> {
+  const res = await fetch(`${BASE_URL}/api/receiving/shipments`, { headers: headers(userId) })
+  if (!res.ok) throw new Error(`Receiving shipments fetch failed: ${res.status}`)
+  return res.json()
+}
+
+export async function receivePackingUnits(
+  shipmentId: string,
+  packingUnitIds: string[],
+  userId: string,
+): Promise<ReceivingResult> {
+  const res = await fetch(`${BASE_URL}/api/receiving/${shipmentId}/packing-units`, {
+    method: 'POST',
+    headers: headers(userId),
+    body: JSON.stringify({ idempotencyKey: crypto.randomUUID(), packingUnitIds }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(
+      (err as { message?: string }).message ?? `Receiving update failed: ${res.status}`,
+    )
+  }
+  return res.json()
+}

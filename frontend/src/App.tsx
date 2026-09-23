@@ -9,6 +9,7 @@ import { navigate, usePathname } from './navigation'
 import PackingUnitPage from './components/PackingUnitPage'
 import ShipmentPage from './components/ShipmentPage'
 import DistributionPage from './components/DistributionPage'
+import ReceivingPage from './components/ReceivingPage'
 import { useCurrentUser } from './auth/useCurrentUser'
 import { clearCurrentUser, userDisplayName } from './auth/session'
 
@@ -34,6 +35,7 @@ export default function App() {
     if (route === 'packing') navigate('/packing')
     else if (route === 'transport') navigate('/transport')
     else if (route === 'distribution') navigate('/distribution')
+    else if (route === 'receiving') navigate('/receiving')
     else if (route === 'admin') navigate('/admin/users')
     else if (route === 'poc') navigate('/poc/dashboard')
     else console.log('navigate ->', route)
@@ -70,6 +72,18 @@ export default function App() {
     )
 
   if (!user) return <HomePage />
+  if (pathname === '/receiving')
+    return (
+      <ReceivingPage
+        userId={user.id}
+        onExit={handleBack}
+        onNavigate={handleNavigate}
+      />
+    )
+  if (pathname === '/transport')
+    return <ShipmentPage onBack={handleBack} userId={user.id} orgScopeId={user.orgScopeId} />
+  if (pathname === '/poc/dashboard') return <PocDashboardPage userId={user.id} onBack={handleBack} />
+  if (pathname === '/admin/users') return <AdminUsersPage userId={user.id} onBack={handleBack} />  
 
   return (
     <LogisticsMainMenu

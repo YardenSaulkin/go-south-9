@@ -77,6 +77,17 @@ export const receivingSchema = z.object({
 
 export type ReceivingInput = z.infer<typeof receivingSchema>;
 
+// Receiving happens in passes: the crew marks whatever came off the truck now,
+// and the shipment only closes once every packing unit has been accounted for.
+export const receivePackingUnitsSchema = z.object({
+  idempotencyKey: uuidSchema,
+  packingUnitIds: z.array(uuidSchema).min(1, 'יש לבחור יחידת אריזה אחת לפחות'),
+});
+
+export type ReceivePackingUnitsInput = z.infer<
+  typeof receivePackingUnitsSchema
+>;
+
 export const distributionSchema = z.object({
   idempotencyKey: uuidSchema,
   finalConfirmation: z.boolean(),

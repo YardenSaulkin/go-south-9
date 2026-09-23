@@ -44,7 +44,9 @@ export class PocService {
     const pending = shipments.filter((s) => s.status === ShipmentStatus.arrived);
     const verified = shipments.filter((s) => s.status === ShipmentStatus.verified);
 
-    return { shipments, pending, verified };
+    const isAdmin = user.access.canViewGlobalShipmentsDashboard;
+
+    return { shipments, pending, verified, unitNames: isAdmin ? {} : undefined };
   }
 
   async verifyShipment(user: CurrentUser, shipmentId: string) {
