@@ -53,7 +53,6 @@ export class AuthService {
     }
 
     const orgCode = `${input.unit}${input.anaf}${input.mador}${input.team}`;
-
     const orgScope = await this.findOrCreateOrgScope(input.mador, orgCode);
 
     const user = await db.user.create({

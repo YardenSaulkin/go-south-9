@@ -98,6 +98,7 @@ model OrgScope {
   shipments    Shipment[]
   packingUnits PackingUnit[]
   items        Item[]
+
   @@map("org_scopes")
 }
 
@@ -127,6 +128,7 @@ model User {
   finalizedDiscrepancies Discrepancy[]      @relation("DiscrepancyFinalizer")
   operationRequests      OperationRequest[]
   operationEvents        OperationEvent[]
+
   @@map("users")
 }
 
@@ -214,17 +216,17 @@ model Item {
 }
 
 view UserAccessProfile {
-  userId                          String    @map("user_id") @db.Uuid
+  userId                          String   @map("user_id") @db.Uuid
   role                            UserRole
-  accessMador                     String?   @map("access_mador")
-  accessUnitCode                  String?   @map("access_unit_code")
-  canCreateShipments              Boolean   @map("can_create_shipments")
-  canCreatePackingUnits           Boolean   @map("can_create_packing_units")
-  canViewShipments                Boolean   @map("can_view_shipments")
-  canViewPackingUnits             Boolean   @map("can_view_packing_units")
-  canViewGlobalShipmentsDashboard Boolean   @map("can_view_global_shipments_dashboard")
-  canApproveShipments             Boolean   @map("can_approve_shipments")
-  dataVisibilityScope             String?   @map("data_visibility_scope")
+  accessMador                     String?  @map("access_mador")
+  accessUnitCode                  String?  @map("access_unit_code")
+  canCreateShipments              Boolean  @map("can_create_shipments")
+  canCreatePackingUnits           Boolean  @map("can_create_packing_units")
+  canViewShipments                Boolean  @map("can_view_shipments")
+  canViewPackingUnits             Boolean  @map("can_view_packing_units")
+  canViewGlobalShipmentsDashboard Boolean  @map("can_view_global_shipments_dashboard")
+  canApproveShipments             Boolean  @map("can_approve_shipments")
+  dataVisibilityScope             String?  @map("data_visibility_scope")
 
   @@map("user_access_profiles")
 }

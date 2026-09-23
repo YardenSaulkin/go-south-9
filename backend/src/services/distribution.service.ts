@@ -30,7 +30,7 @@ export class DistributionService {
     if (orgScopeId) {
       const scope = await db.orgScope.findUnique({ where: { id: orgScopeId } });
       if (!scope) throw new NotFoundException('המסגרת הארגונית לא נמצאה');
-      assertCanAccessOrgScope(user.access, scope.mador, scope.orgCode);
+      assertCanAccessOrgScope(user.access, scope.mador, scope.orgCode ?? null);
     }
 
     const units = await db.packingUnit.findMany({
@@ -42,7 +42,7 @@ export class DistributionService {
             ? {}
             : { orgScope: { mador: user.access.accessMador ?? '' } }),
       },
-      include: { items: true, shipment: true, orgScope: true },
+      include: { items: true, shipment: true, orgScope: true, createdBy: true },
       orderBy: { serialNumber: 'asc' },
     });
 
@@ -62,9 +62,22 @@ export class DistributionService {
       include: { items: true, orgScope: true },
     });
     if (!unit) throw new NotFoundException('יחידת האריזה לא נמצאה');
-    assertCanAccessOrgScope(user.access, unit.orgScope.mador, unit.orgScope.orgCode);
+    assertCanAccessOrgScope(user.access, unit.orgScope.mador, unit.orgScope.orgCode ?? null);
     if (unit.status !== PackingUnitStatus.arrived_pending_verification) {
       throw new ConflictException('יחידת האריזה אינה ממתינה לפיזור');
+    }
+
+    if (unit.shipmentId) {
+      const pocApproved = await db.operationEvent.findFirst({
+        where: {
+          entityType: 'shipment',
+          entityId: unit.shipmentId,
+          action: 'poc_confirmed_packages',
+        },
+      });
+      if (!pocApproved) {
+        throw new ConflictException('יש לקבל אישור קצין קישור לאריזות לפני הפיזור');
+      }
     }
 
     const submitted = new Map(

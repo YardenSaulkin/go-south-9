@@ -14,6 +14,7 @@ import {
   createTheme,
   ThemeProvider,
 } from "@mui/material";
+import { alignWithLogo } from "./AppLogo";
 import {
   Package,
   Truck,
@@ -50,6 +51,8 @@ export interface MainMenuProps {
   user: User;
   onNavigate: (route: NavigateRoute) => void;
   onLogout: () => void;
+  activeTab?: TabValue;
+  onTabChange?: (tab: TabValue) => void;
 }
 
 const SENDING_CARDS: ActionCardItem[] = [
@@ -66,15 +69,16 @@ const ADMIN_CARDS: ActionCardItem[] = [
   { label: "ניהול משתמשים", route: "admin", Icon: Users },
 ];
 
-const POC_CARDS: ActionCardItem[] = [
-  { label: "דשבורד קישור", route: "poc", Icon: BarChart3 },
-];
+const POC_CARDS: ActionCardItem[] = [];
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "מנהל",
   poc: "קצין קישור",
   normal: "משתמש",
 };
+
+// Kept in sync with the Avatar's width/height so it can be centred on the logo.
+const AVATAR_SIZE = 40;
 
 const theme = createTheme({
   direction: "rtl",
@@ -96,8 +100,10 @@ export default function LogisticsMainMenu({
   user,
   onNavigate,
   onLogout,
+  activeTab: activeTabProp,
+  onTabChange,
 }: MainMenuProps) {
-  const [activeTab, setActiveTab] = useState<TabValue>("sending");
+  const [activeTab, setActiveTab] = useState<TabValue>(activeTabProp ?? "sending");
   const [animKey, setAnimKey] = useState(0);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
 
@@ -105,8 +111,10 @@ export default function LogisticsMainMenu({
 
   const baseCards = activeTab === "sending" ? SENDING_CARDS : RECEIVING_CARDS;
   const cards = baseCards;
-  const roleCard =
-    user.role === "admin" ? ADMIN_CARDS[0] : user.role === "poc" ? POC_CARDS[0] : null;
+  const roleCards: ActionCardItem[] =
+    user.role === "admin"
+      ? [...ADMIN_CARDS]
+      : [];
 
   const handleTabChange = (
     _: React.MouseEvent<HTMLElement>,
@@ -114,6 +122,7 @@ export default function LogisticsMainMenu({
   ) => {
     if (val && val !== activeTab) {
       setActiveTab(val);
+      onTabChange?.(val);
       setAnimKey((k) => k + 1);
     }
   };
@@ -125,7 +134,7 @@ export default function LogisticsMainMenu({
         dir="rtl"
         sx={{
           width: "100vw",
-          height: "100dvh",
+          height: "calc(100dvh - 62px)",
           position: "relative",
           backgroundImage: "url(/desert-bg.jpg)",
           backgroundSize: "cover",
@@ -155,22 +164,44 @@ export default function LogisticsMainMenu({
             width: "100%",
             flexGrow: 1,
             px: "5vw",
-            pt: "6vh",
+            // Puts the first row — the avatar — level with the fixed AppLogo.
+            pt: alignWithLogo(AVATAR_SIZE),
             pb: "4vh",
             gap: "2vh",
           }}
         >
-          {/* Greeting row: avatar left + text right */}
+          {/* Greeting block: avatar pinned right, greeting text beneath it */}
           <Box
             sx={{
               display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
+              flexDirection: "column",
+              // RTL column: flex-start is the right edge
+              alignItems: "flex-start",
               width: "100%",
-              gap: 1.5,
+              gap: 1,
             }}
           >
+            <Avatar
+              onClick={(e) => setMenuAnchor(e.currentTarget)}
+              aria-label="תפריט משתמש"
+              sx={{
+                width: AVATAR_SIZE,
+                height: AVATAR_SIZE,
+                flexShrink: 0,
+                cursor: "pointer",
+                WebkitTapHighlightColor: "transparent",
+                bgcolor: "rgba(139, 94, 60, 0.85)",
+                border: "2px solid rgba(255,255,255,0.55)",
+                fontSize: "1rem",
+                fontFamily: "Heebo, sans-serif",
+                fontWeight: 700,
+                backdropFilter: "blur(4px)",
+                WebkitBackdropFilter: "blur(4px)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+              }}
+            >
+              {getInitials(user.name)}
+            </Avatar>
             <Box
               sx={{
                 display: "flex",
@@ -207,33 +238,12 @@ export default function LogisticsMainMenu({
                 />
               )}
             </Box>
-            <Avatar
-              onClick={(e) => setMenuAnchor(e.currentTarget)}
-              aria-label="תפריט משתמש"
-              sx={{
-                width: 40,
-                height: 40,
-                flexShrink: 0,
-                cursor: "pointer",
-                WebkitTapHighlightColor: "transparent",
-                bgcolor: "rgba(139, 94, 60, 0.85)",
-                border: "2px solid rgba(255,255,255,0.55)",
-                fontSize: "1rem",
-                fontFamily: "Heebo, sans-serif",
-                fontWeight: 700,
-                backdropFilter: "blur(4px)",
-                WebkitBackdropFilter: "blur(4px)",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-              }}
-            >
-              {getInitials(user.name)}
-            </Avatar>
             <Menu
               anchorEl={menuAnchor}
               open={Boolean(menuAnchor)}
               onClose={() => setMenuAnchor(null)}
-              anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-              transformOrigin={{ vertical: "top", horizontal: "left" }}
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+              transformOrigin={{ vertical: "top", horizontal: "right" }}
               slotProps={{
                 paper: {
                   sx: { borderRadius: "14px", minWidth: 160, mt: 0.5 },
@@ -260,33 +270,37 @@ export default function LogisticsMainMenu({
             </Menu>
           </Box>
 
-          {/* Role shortcut button — admin/POC only */}
-          {roleCard && (
-            <Button
-              onClick={() => onNavigate(roleCard.route)}
-              startIcon={<roleCard.Icon size={16} />}
-              size="small"
-              sx={{
-                fontFamily: 'Heebo, sans-serif',
-                fontWeight: 600,
-                fontSize: '0.82rem',
-                textTransform: 'none',
-                color: 'white',
-                bgcolor: 'rgba(139,94,60,0.55)',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: '999px',
-                px: 2,
-                py: 0.5,
-                alignSelf: 'center',
-                gap: 0.75,
-                '& .MuiButton-startIcon': { margin: 0 },
-                '&:hover': { bgcolor: 'rgba(139,94,60,0.75)' },
-              }}
-            >
-              {roleCard.label}
-            </Button>
+          {/* Role shortcut buttons — admin/POC only */}
+          {roleCards.length > 0 && (
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+              {roleCards.map((rc) => (
+                <Button
+                  key={rc.route}
+                  onClick={() => onNavigate(rc.route)}
+                  startIcon={<rc.Icon size={16} />}
+                  size="small"
+                  sx={{
+                    fontFamily: 'Heebo, sans-serif',
+                    fontWeight: 600,
+                    fontSize: '0.82rem',
+                    textTransform: 'none',
+                    color: 'white',
+                    bgcolor: 'rgba(139,94,60,0.55)',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    borderRadius: '999px',
+                    px: 2,
+                    py: 0.5,
+                    gap: 0.75,
+                    '& .MuiButton-startIcon': { margin: 0 },
+                    '&:hover': { bgcolor: 'rgba(139,94,60,0.75)' },
+                  }}
+                >
+                  {rc.label}
+                </Button>
+              ))}
+            </Box>
           )}
 
           {/* Pill Toggle */}

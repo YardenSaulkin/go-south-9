@@ -68,7 +68,7 @@ export default function AdminUsersPage({ userId }: Props) {
 
   return (
     <ThemeProvider theme={theme}>
-      <Box dir="rtl" sx={{ minHeight: '100dvh', bgcolor: '#f5f0eb', p: 3 }}>
+      <Box dir="rtl" sx={{ minHeight: 'calc(100dvh - 62px)', bgcolor: '#f5f0eb', p: 3 }}>
         {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
           <IconButton onClick={() => navigate('/menu')} size="small">
@@ -112,9 +112,9 @@ export default function AdminUsersPage({ userId }: Props) {
                 <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontSize: '0.82rem', color: '#666', mb: 0.5 }}>
                   {user.personalNumber ?? '—'} · {user.email}
                 </Typography>
-                {/* Row 3: unit */}
+                {/* Row 3: org code */}
                 <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontSize: '0.82rem', color: '#666', mb: user.role !== 'admin' ? 1 : 0 }}>
-                  {user.orgNames?.unit ?? user.orgCode?.substring(0, 2) ?? '—'}
+                  {user.orgCode ?? '—'}
                 </Typography>
                 {/* Row 4: action button */}
                 {user.role !== 'admin' && (

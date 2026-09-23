@@ -7,6 +7,7 @@ import { AdminController } from './controllers/admin.controller.js';
 import { AuthController } from './controllers/auth.controller.js';
 import { PocController } from './controllers/poc.controller.js';
 import { ContextController } from './controllers/context.controller.js';
+import { StatusController } from './controllers/status.controller.js';
 import { DashboardController } from './controllers/dashboard.controller.js';
 import { DestinationController } from './controllers/destination.controller.js';
 import { DistributionController } from './controllers/distribution.controller.js';
@@ -22,6 +23,7 @@ import { DistributionService } from './services/distribution.service.js';
 import { PackingService } from './services/packing.service.js';
 import { ReceivingService } from './services/receiving.service.js';
 import { ShipmentService } from './services/shipment.service.js';
+import { StatusService } from './services/status.service.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -56,6 +58,7 @@ const observeAppSecret = process.env.OBSERVE_APP_SECRET;
     DistributionController,
     DashboardController,
     PocController,
+    StatusController,
   ],
   providers: [
     AppService,
@@ -69,6 +72,7 @@ const observeAppSecret = process.env.OBSERVE_APP_SECRET;
     DistributionService,
     DashboardService,
     PocService,
+    StatusService,
   ],
 })
 export class AppModule {}

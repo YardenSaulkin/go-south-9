@@ -15,7 +15,6 @@ export interface AdminUserView {
   personalNumber: string | null;
   role: UserRole;
   orgCode: string | null;
-  orgNames: { unit: string; anaf: string; mador: string; team: string } | null;
 }
 
 @Injectable()
