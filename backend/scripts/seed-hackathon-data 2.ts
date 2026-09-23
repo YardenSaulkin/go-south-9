@@ -3,13 +3,11 @@ import type {
   PackingUnitStatus,
   Prisma,
   PrismaClient,
-  ShipmentStatus,
 } from '@prisma/client';
 import {
   SEED_NAME,
   SEED_TIMESTAMP,
   hackathonDataset,
-  type MovementScenario,
   type OrgSeed,
 } from './seed-data/hackathon-data.ts';
 
@@ -52,142 +50,217 @@ function hierarchyCounts() {
   };
 }
 
-function scenarioCoverage(): Record<MovementScenario, Record<string, number>> {
-  const result = {} as Record<MovementScenario, Record<string, number>>;
-  for (const scenario of ['A', 'B', 'C', 'D'] as const) {
-    result[scenario] = counts(
-      hackathonDataset.items
-        .filter((item) => item.scenario === scenario)
-        .map((item) => item.status),
-    );
+function coverage() {
+  const bySource = new Map<string, Set<string>>();
+  const byDestination = new Map<string, Set<string>>();
+  for (const item of hackathonDataset.items) {
+    const destinations = bySource.get(item.sourceRoomId) ?? new Set<string>();
+    destinations.add(item.destinationRoomId);
+    bySource.set(item.sourceRoomId, destinations);
+    const sources =
+      byDestination.get(item.destinationRoomId) ?? new Set<string>();
+    sources.add(item.sourceRoomId);
+    byDestination.set(item.destinationRoomId, sources);
   }
-  return result;
+  const general = [...bySource.entries()].filter(
+    ([source]) =>
+      !hackathonDataset.rooms.slice(0, 4).some((room) => room.id === source),
+  );
+  return {
+    oneToOne: [...bySource.values()].some(
+      (destinations) => destinations.size === 1,
+    ),
+    oneToMany: [...bySource.values()].some(
+      (destinations) => destinations.size > 1,
+    ),
+    manyToOne: [...byDestination.values()].some((sources) => sources.size > 1),
+    manyToMany:
+      general.length > 1 &&
+      new Set(general.flatMap(([, destinations]) => [...destinations])).size >
+        1,
+  };
 }
 
 function validateDefinition(): void {
   const hierarchy = hierarchyCounts();
   invariant(
-    hierarchy.units >= 8 && hierarchy.anafim >= 16 && hierarchy.madors >= 28 && hierarchy.teams >= 64,
-    'hierarchy must meet 8 Units / 16 Anafim / 28 Madors / 64 Teams',
+    hierarchy.units === 4 &&
+      hierarchy.anafim === 8 &&
+      hierarchy.madors === 14 &&
+      hierarchy.teams === 32,
+    'hierarchy must be 4 Units / 8 Anafim / 14 Madors / 32 Teams',
+  );
+  const expectedUnits = [
+    ['יחידת מבצעים', 3, 5, 12],
+    ['יחידת תקשוב', 2, 4, 9],
+    ['יחידת מודיעין', 2, 3, 7],
+    ['יחידת מנהלה', 1, 2, 4],
+  ] as const;
+  for (const [unit, anafim, madors, teams] of expectedUnits) {
+    const scopes = hackathonDataset.orgScopes.filter(
+      (scope) => scope.unit === unit,
+    );
+    invariant(
+      new Set(scopes.map((scope) => scope.anaf)).size === anafim,
+      `${unit} Anaf count`,
+    );
+    invariant(
+      new Set(scopes.map((scope) => `${scope.anaf}\0${scope.mador}`)).size ===
+        madors,
+      `${unit} Mador count`,
+    );
+    invariant(scopes.length === teams, `${unit} Team count`);
+  }
+  invariant(
+    new Set(hackathonDataset.orgScopes.map((scope) => scope.orgCode)).size ===
+      32 &&
+      hackathonDataset.orgScopes.every((scope) =>
+        /^\d{8}$/.test(scope.orgCode),
+      ),
+    'Team Org codes must be unique 8-digit values',
+  );
+  invariant(hackathonDataset.rooms.length === 32, 'expected 32 source Rooms');
+  const reports = hackathonDataset.rooms.flatMap((room) =>
+    room.mappingReportId ? [room.mappingReportId] : [],
   );
   invariant(
-    hackathonDataset.orgScopes.every(
-      (scope) =>
-        /^\d{2}$/.test(scope.unit) &&
-        /^\d{2}$/.test(scope.anaf) &&
-        /^\d{2}$/.test(scope.mador) &&
-        /^\d{2}$/.test(scope.team) &&
-        /^\d{8}$/.test(scope.orgCode) &&
-        scope.description === `${scope.unit} / ${scope.anaf} / ${scope.mador} / ${scope.team}`,
-    ),
-    'organization labels must be numeric-only and canonical',
-  );
-  invariant(
-    new Set(hackathonDataset.orgScopes.map((scope) => scope.orgCode)).size === hierarchy.teams,
-    'Team Org codes must be unique',
-  );
-
-  const mappedRooms = hackathonDataset.rooms.filter((room) => room.mappingReportId);
-  const reports = mappedRooms.map((room) => room.mappingReportId as string);
-  invariant(hackathonDataset.rooms.length >= 64, 'expected at least 64 source Rooms');
-  invariant(
-    reports.length === hackathonDataset.rooms.length - 2 &&
-      reports.every((report, index) => report === `report-${String(index + 32).padStart(6, '0')}`),
+    reports.length === 31 &&
+      new Set(reports).size === 31 &&
+      reports[0] === 'report-000001',
     'MappingReport sequence',
   );
   invariant(
-    new Set(hackathonDataset.rooms.map((room) => room.id)).size === hackathonDataset.rooms.length &&
-      hackathonDataset.rooms.every((room) => room.description === room.id.replace('room-', 'חדר-')),
-    'source Room identity and descriptions',
+    hackathonDataset.destinations.length === 12,
+    'expected 12 destinations',
   );
-
-  invariant(hackathonDataset.destinations.length === 12, 'expected 12 canonical destinations');
   invariant(
-    new Set(hackathonDataset.destinations.map((destination) => destination.id)).size === 12 &&
-      hackathonDataset.destinations.every((destination) => !destination.description.trim().startsWith('{')),
-    'destination IDs must be unique and descriptions must not be JSON',
+    new Set(hackathonDataset.destinations.map((destination) => destination.id))
+      .size === 12,
+    'destination IDs must be unique',
   );
 
-  invariant(hackathonDataset.items.length >= 114, 'expected at least 50 Items beyond the original dataset');
+  invariant(hackathonDataset.items.length === 64, 'expected 64 Items');
   const itemCounts = counts(hackathonDataset.items.map((item) => item.status));
+  const expectedItems: Record<string, number> = {
+    not_sent: 48,
+    assigned_to_packing_unit: 6,
+    in_transit: 4,
+    arrived_pending_verification: 3,
+    verified: 3,
+  };
   invariant(
-    itemCounts.not_sent === 34 && itemCounts.assigned_to_packing_unit === 32 &&
-      itemCounts.in_transit === 32 && itemCounts.arrived_pending_verification === 32 &&
-      itemCounts.verified === 32,
+    Object.entries(expectedItems).every(
+      ([status, count]) => itemCounts[status] === count,
+    ),
     'Item status distribution',
   );
-  const unmapped = hackathonDataset.items.filter((item) => item.sourceMappingReportId === null);
-  invariant(unmapped.length >= 2 && unmapped.length <= 4, 'only a few unmapped Items');
-  invariant(unmapped.every((item) => item.scenario === 'supporting'), 'unmapped Items are dedicated examples');
-  invariant(
-    hackathonDataset.items.every((item) => {
-      const room = hackathonDataset.rooms.find((candidate) => candidate.id === item.sourceRoomId);
-      return room?.orgScopeId === item.orgScopeId && room.description === item.sourceDescription &&
-        (room.mappingReportId === item.sourceMappingReportId || item.sourceMappingReportId === null);
-    }),
-    'Item source Room/org/report consistency',
+  const unmapped = hackathonDataset.items.filter(
+    (item) => item.sourceMappingReportId === null,
   );
   invariant(
-    hackathonDataset.items.every((item) => item.quantity > 0 && item.distributedQuantity >= 0 && item.distributedQuantity <= item.quantity),
-    'Item quantity constraints',
+    unmapped.length === 2 &&
+      new Set(unmapped.map((item) => item.sourceRoomId)).size === 1,
+    'exactly 2 isolated unmapped Items',
   );
   invariant(
-    [1, 2, 3, 4, 5, 8, 10, 15, 20].every((quantity) => hackathonDataset.items.some((item) => item.quantity === quantity)),
-    'Item quantity variation',
-  );
-  invariant(
-    hackathonDataset.items.filter((item) => item.status === 'not_sent').every((item) => item.packingUnitId === null && item.distributedQuantity === 0),
+    hackathonDataset.items
+      .filter((item) => item.status === 'not_sent')
+      .every(
+        (item) => item.packingUnitId === null && item.distributedQuantity === 0,
+      ),
     'not_sent Items must be unpacked and undistributed',
   );
-  invariant(hackathonDataset.items.some((item) => item.ownerSlot === 'secondary'), 'ownership visibility example');
+  invariant(
+    hackathonDataset.orgScopes.every((scope) =>
+      hackathonDataset.items.some((item) => item.orgScopeId === scope.id),
+    ),
+    'every Team must own at least one Item',
+  );
+  invariant(
+    hackathonDataset.items.every(
+      (item) =>
+        item.quantity > 0 &&
+        item.distributedQuantity >= 0 &&
+        item.distributedQuantity <= item.quantity,
+    ),
+    'Item quantity constraints',
+  );
 
-  const matrix = scenarioCoverage();
-  for (const scenario of ['A', 'B', 'C', 'D'] as const) {
-    invariant(Object.values(matrix[scenario]).every((count) => count === 8), `${scenario} requires 8 examples per state`);
-    const scenarioItems = hackathonDataset.items.filter((item) => item.scenario === scenario);
-    const sources = new Set(scenarioItems.map((item) => item.sourceRoomId));
-    const destinations = new Set(scenarioItems.map((item) => item.destinationRoomId));
-    if (scenario === 'A') invariant(sources.size === 1 && destinations.size === 1, 'A is one source to one destination');
-    if (scenario === 'B') invariant(sources.size === 1 && destinations.size > 1, 'B is one source to many destinations');
-    if (scenario === 'C') invariant(sources.size > 1 && destinations.size === 1, 'C is many sources to one destination');
-    if (scenario === 'D') invariant(sources.size > 1 && destinations.size > 1, 'D is many sources to many destinations');
-  }
-
-  invariant(hackathonDataset.packingUnits.length >= 28 && hackathonDataset.packingUnits.length <= 37, 'PackingUnit expansion size');
-  const packingCounts = counts(hackathonDataset.packingUnits.map((unit) => unit.status));
-  invariant(['not_sent', 'assigned_to_shipment', 'in_transit', 'arrived_pending_verification', 'verified'].every((status) => (packingCounts[status] ?? 0) >= 3), 'PackingUnit status coverage');
-  invariant(new Set(hackathonDataset.packingUnits.map((unit) => unit.packingUnitType)).size === 5, 'all PackingUnit types');
-  const personal = hackathonDataset.packingUnits.filter((unit) => unit.packingUnitType === 'personal_carton');
-  invariant(personal.length >= 2 && personal.every((unit) => !hackathonDataset.items.some((item) => item.packingUnitId === unit.id)), 'Personal Cartons must be empty');
-  const parentStatus: Record<Exclude<ItemStatus, 'not_sent'>, PackingUnitStatus> = {
-    assigned_to_packing_unit: 'assigned_to_shipment', in_transit: 'in_transit', arrived_pending_verification: 'arrived_pending_verification', verified: 'verified',
+  invariant(
+    hackathonDataset.packingUnits.length === 12,
+    'expected 12 PackingUnits',
+  );
+  invariant(
+    new Set(hackathonDataset.packingUnits.map((unit) => unit.packingUnitType))
+      .size === 5,
+    'all PackingUnit types',
+  );
+  const personal = hackathonDataset.packingUnits.filter(
+    (unit) => unit.packingUnitType === 'personal_carton',
+  );
+  invariant(personal.length === 2, 'expected 2 personal cartons');
+  invariant(
+    personal.every(
+      (unit) =>
+        !hackathonDataset.items.some((item) => item.packingUnitId === unit.id),
+    ),
+    'personal cartons must be empty',
+  );
+  const parentStatus: Partial<Record<ItemStatus, PackingUnitStatus>> = {
+    assigned_to_packing_unit: 'assigned_to_shipment',
+    in_transit: 'in_transit',
+    arrived_pending_verification: 'arrived_pending_verification',
+    verified: 'verified',
   };
-  for (const item of hackathonDataset.items) {
-    if (item.status === 'not_sent') continue;
-    const parent = hackathonDataset.packingUnits.find((unit) => unit.id === item.packingUnitId);
-    invariant(parent, `Item ${item.id} parent exists`);
-    invariant(parent.status === parentStatus[item.status] && parent.packingUnitType !== 'personal_carton' && parent.orgScopeId === item.orgScopeId, `Item ${item.id} parent relation`);
+  for (const item of hackathonDataset.items.filter(
+    (item) => item.status !== 'not_sent',
+  )) {
+    const parent = hackathonDataset.packingUnits.find(
+      (unit) => unit.id === item.packingUnitId,
+    );
+    invariant(
+      parent && parent.status === parentStatus[item.status],
+      `Item ${item.id} parent status`,
+    );
+    invariant(
+      parent.packingUnitType !== 'personal_carton' &&
+        parent.orgScopeId === item.orgScopeId,
+      `Item ${item.id} parent relation`,
+    );
   }
 
-  invariant(hackathonDataset.shipments.length >= 8 && hackathonDataset.shipments.length <= 12, 'Shipment expansion size');
-  const shipmentCounts = counts(hackathonDataset.shipments.map((shipment) => shipment.status));
-  invariant(['not_sent', 'sent', 'arrived', 'verified'].every((status) => (shipmentCounts[status] ?? 0) >= 2), 'Shipment status coverage');
-  const shipmentStatus: Record<PackingUnitStatus, ShipmentStatus | null> = { not_sent: null, assigned_to_shipment: 'not_sent', in_transit: 'sent', arrived_pending_verification: 'arrived', verified: 'verified' };
+  invariant(hackathonDataset.shipments.length === 4, 'expected 4 Shipments');
+  const shipmentStatus: Record<PackingUnitStatus, string | null> = {
+    not_sent: null,
+    assigned_to_shipment: 'not_sent',
+    in_transit: 'sent',
+    arrived_pending_verification: 'arrived',
+    verified: 'verified',
+  };
   for (const unit of hackathonDataset.packingUnits) {
     const expected = shipmentStatus[unit.status];
-    if (expected === null) invariant(unit.shipmentId === null, `${unit.id} must be standalone`);
+    if (expected === null)
+      invariant(unit.shipmentId === null, `${unit.id} must be standalone`);
     else {
-      const shipment = hackathonDataset.shipments.find((row) => row.id === unit.shipmentId);
-      invariant(shipment, `${unit.id} Shipment exists`);
-      invariant(shipment.status === expected && shipment.orgScopeId === unit.orgScopeId, `${unit.id} Shipment relation`);
+      const shipment = hackathonDataset.shipments.find(
+        (row) => row.id === unit.shipmentId,
+      );
+      invariant(
+        shipment?.status === expected &&
+          shipment.orgScopeId === unit.orgScopeId,
+        `${unit.id} Shipment relation`,
+      );
     }
   }
-  invariant(hackathonDataset.shipments.every((shipment) => hackathonDataset.packingUnits.filter((unit) => unit.shipmentId === shipment.id).length > 0), 'every Shipment has PackingUnits');
+  invariant(
+    Object.values(coverage()).every(Boolean),
+    'all four source/destination scenarios',
+  );
 }
 
 function summary(mode: Mode): void {
   const hierarchy = hierarchyCounts();
-  const matrix = scenarioCoverage();
+  const scenarios = coverage();
   const format = (value: Record<string, number>) =>
     Object.entries(value)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -197,61 +270,57 @@ function summary(mode: Mode): void {
   console.log(
     `Mode: ${mode === 'apply' ? 'APPLY' : 'DRY-RUN (no database connection or mutation)'}`,
   );
-  console.log('ORGANIZATION');
-  console.log(`  Units: ${hierarchy.units}`);
-  console.log(`  Anafim: ${hierarchy.anafim}`);
-  console.log(`  Madors: ${hierarchy.madors}`);
-  console.log(`  Teams: ${hierarchy.teams}`);
-  console.log('  ORG LABELS NUMERIC ONLY: PASS');
+  console.log(`Units: ${hierarchy.units}`);
+  console.log(`Anafim: ${hierarchy.anafim}`);
+  console.log(`Madors: ${hierarchy.madors}`);
+  console.log(`Teams: ${hierarchy.teams}`);
   console.log(`Source Rooms: ${hackathonDataset.rooms.length}`);
   console.log(
     `Destinations (canonical snapshots; no current table): ${hackathonDataset.destinations.length}`,
   );
   console.log(
-    `MappingReports: ${hackathonDataset.rooms.filter((room) => room.mappingReportId).length}`,
+    `MappingReports: ${new Set(hackathonDataset.items.flatMap((item) => (item.sourceMappingReportId ? [item.sourceMappingReportId] : []))).size}`,
   );
-  console.log('ITEMS');
-  console.log(`  Total: ${hackathonDataset.items.length}`);
+  console.log(`Items: ${hackathonDataset.items.length}`);
   console.log(
-    `  Statuses: ${format(counts(hackathonDataset.items.map((item) => item.status)))}`,
-  );
-  console.log(
-    `  Unmapped: ${hackathonDataset.items.filter((item) => item.sourceMappingReportId === null).length}`,
-  );
-  console.log('PACKING UNITS');
-  console.log(`  Total: ${hackathonDataset.packingUnits.length}`);
-  console.log(
-    `  Types: ${format(counts(hackathonDataset.packingUnits.map((unit) => unit.packingUnitType)))}`,
+    `Item statuses: ${format(counts(hackathonDataset.items.map((item) => item.status)))}`,
   );
   console.log(
-    `  Statuses: ${format(counts(hackathonDataset.packingUnits.map((unit) => unit.status)))}`,
+    `Unmapped Items: ${hackathonDataset.items.filter((item) => item.sourceMappingReportId === null).length}`,
   );
-  console.log('SHIPMENTS');
-  console.log(`  Total: ${hackathonDataset.shipments.length}`);
+  console.log(`PackingUnits: ${hackathonDataset.packingUnits.length}`);
   console.log(
-    `  Statuses: ${format(counts(hackathonDataset.shipments.map((shipment) => shipment.status)))}`,
+    `PackingUnit types: ${format(counts(hackathonDataset.packingUnits.map((unit) => unit.packingUnitType)))}`,
   );
-  console.log('MOVEMENT SCENARIOS (A/B/C/D; state order: not_sent, assigned, transit, arrived, verified)');
-  for (const [scenario, label] of [
-    ['A', 'One Source -> One Destination'],
-    ['B', 'One Source -> Many Destinations'],
-    ['C', 'Many Sources -> One Destination'],
-    ['D', 'Many Sources -> Many Destinations'],
-  ] as const) {
-    console.log(`  ${scenario} ${label}: ${format(matrix[scenario])}`);
-  }
+  console.log(
+    `PackingUnit statuses: ${format(counts(hackathonDataset.packingUnits.map((unit) => unit.status)))}`,
+  );
+  console.log(`Shipments: ${hackathonDataset.shipments.length}`);
+  console.log(
+    `Shipment statuses: ${format(counts(hackathonDataset.shipments.map((shipment) => shipment.status)))}`,
+  );
+  console.log('Scenario coverage:');
+  console.log(
+    `  one source -> one destination: ${scenarios.oneToOne ? 'yes' : 'no'}`,
+  );
+  console.log(
+    `  one source -> many destinations: ${scenarios.oneToMany ? 'yes' : 'no'}`,
+  );
+  console.log(
+    `  many sources -> one destination: ${scenarios.manyToOne ? 'yes' : 'no'}`,
+  );
+  console.log(
+    `  many sources -> many destinations: ${scenarios.manyToMany ? 'yes' : 'no'}`,
+  );
 }
 
-async function selectApplyUsers(db: PrismaClient) {
-  const users = await db.user.findMany({
-    orderBy: { id: 'asc' },
-    take: 2,
-  });
-  const actor =
-    users.find((user) => user.role === 'admin') ??
-    (await db.user.findFirst({ orderBy: { id: 'asc' } }));
-  const secondaryOwner = users.find((user) => user.id !== actor?.id) ?? null;
-  return { actor, secondaryOwner };
+async function selectActor(db: PrismaClient) {
+  return (
+    (await db.user.findFirst({
+      where: { role: 'admin' },
+      orderBy: { id: 'asc' },
+    })) ?? db.user.findFirst({ orderBy: { id: 'asc' } })
+  );
 }
 
 async function impact(db: PrismaClient): Promise<void> {
@@ -374,11 +443,11 @@ async function verify(db: Db, scopeMap: Map<string, string>): Promise<void> {
     }),
   ]);
   invariant(
-    scopes.length === 64 &&
-      new Set(scopes.map((scope) => scope.orgCode)).size === 64,
+    scopes.length === 32 &&
+      new Set(scopes.map((scope) => scope.orgCode)).size === 32,
     'persisted Team scopes',
   );
-  invariant(items.length === hackathonDataset.items.length, 'persisted Item count');
+  invariant(items.length === 64, 'persisted Item count');
   const expectedCounts = counts(
     hackathonDataset.items.map((item) => item.status),
   );
@@ -399,14 +468,14 @@ async function verify(db: Db, scopeMap: Map<string, string>): Promise<void> {
     items.filter((item) => item.sourceMappingReportId === null).length === 2,
     'persisted unmapped Items',
   );
-  invariant(units.length === hackathonDataset.packingUnits.length, 'persisted PackingUnit count');
+  invariant(units.length === 12, 'persisted PackingUnit count');
   invariant(
     units
       .filter((unit) => unit.packingUnitType === 'personal_carton')
       .every((unit) => unit.items.length === 0),
     'persisted personal cartons',
   );
-  invariant(shipments.length === hackathonDataset.shipments.length, 'persisted Shipment count');
+  invariant(shipments.length === 4, 'persisted Shipment count');
   const validChildren: Record<string, PackingUnitStatus> = {
     not_sent: 'assigned_to_shipment',
     sent: 'in_transit',
@@ -430,7 +499,6 @@ async function verify(db: Db, scopeMap: Map<string, string>): Promise<void> {
 async function apply(
   db: PrismaClient,
   actorId: string,
-  secondaryOwnerId: string,
 ): Promise<Map<string, string>> {
   return db.$transaction(
     async (tx) => {
@@ -469,17 +537,14 @@ async function apply(
         })),
       });
       await tx.item.createMany({
-        data: hackathonDataset.items.map((item) => {
-          const { scenario: _scenario, ownerSlot, ...persistedItem } = item;
-          return {
-            ...persistedItem,
-            orgScopeId: scopeId(item.orgScopeId),
-            ownerUserId: ownerSlot === 'secondary' ? secondaryOwnerId : null,
-            createdByUserId: actorId,
-            createdAt: SEED_TIMESTAMP,
-            updatedAt: SEED_TIMESTAMP,
-          };
-        }),
+        data: hackathonDataset.items.map((item) => ({
+          ...item,
+          orgScopeId: scopeId(item.orgScopeId),
+          ownerUserId: null,
+          createdByUserId: actorId,
+          createdAt: SEED_TIMESTAMP,
+          updatedAt: SEED_TIMESTAMP,
+        })),
       });
       await verify(tx, scopeMap);
       return scopeMap;
@@ -503,20 +568,16 @@ async function main(): Promise<void> {
   const db = new PrismaClient();
   try {
     await assertLiveRoleCompatibility(db);
-    const { actor, secondaryOwner } = await selectApplyUsers(db);
+    const actor = await selectActor(db);
     invariant(
       actor,
       'Apply requires an existing User for created_by_user_id; no User was found',
-    );
-    invariant(
-      secondaryOwner,
-      'Apply requires a second existing User for the ownership-visibility example; no User was found',
     );
     console.log(
       `Creator reference: existing User ${actor.id} (${actor.email})`,
     );
     await impact(db);
-    const scopeMap = await apply(db, actor.id, secondaryOwner.id);
+    const scopeMap = await apply(db, actor.id);
     await verify(db, scopeMap);
     console.log('\nAPPLY committed. Post-commit verification passed.');
   } finally {
