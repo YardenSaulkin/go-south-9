@@ -103,7 +103,7 @@ function scopeOptions(
     const value = scopeCode(scope, field);
     if (!value) continue;
     const name = scope[field];
-    values.set(value, name && name !== value ? `${value} · ${name}` : value);
+    values.set(value, value);
   }
   return [...values].map(([value, label]) => ({ value, label }));
 }
@@ -316,6 +316,7 @@ export default function PackingUnitPage({
   const [items, setItems] = useState<EligibleItem[]>([]);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [selected, setSelected] = useState<Record<string, number>>({});
+  const [rawQuantities, setRawQuantities] = useState<Record<string, string>>({});
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
     {},
   );
@@ -635,13 +636,27 @@ export default function PackingUnitPage({
     item: EligibleItem,
     event: ChangeEvent<HTMLInputElement>,
   ) => {
-    const quantity = Number(event.target.value);
-    setSelected((current) => ({
-      ...current,
-      [item.id]: Number.isFinite(quantity)
-        ? Math.min(item.quantity, Math.max(1, Math.floor(quantity)))
-        : 1,
-    }));
+    const raw = event.target.value;
+    setRawQuantities((current) => ({ ...current, [item.id]: raw }));
+    const quantity = Number(raw);
+    if (raw !== "" && Number.isFinite(quantity) && quantity >= 1) {
+      setSelected((current) => ({
+        ...current,
+        [item.id]: Math.min(item.quantity, Math.floor(quantity)),
+      }));
+    }
+  };
+  const commitQuantity = (item: EligibleItem) => {
+    setRawQuantities((current) => {
+      const next = { ...current };
+      delete next[item.id];
+      return next;
+    });
+    setSelected((current) => {
+      const val = current[item.id];
+      if (!val || val < 1) return { ...current, [item.id]: 1 };
+      return current;
+    });
   };
   const changeDestinationMode = (mode: "existing" | "new") => {
     setDestinationMode(mode);
@@ -914,18 +929,22 @@ export default function PackingUnitPage({
                 list="source-rooms"
                 value={source.roomId}
                 disabled={!source.orgScopeId}
-                placeholder={
-                  roomsLoading ? "טוען חדרים…" : "בחר או הזן חדר מקור"
-                }
+                placeholder={roomsLoading ? "טוען חדרים…" : "בחר או הזן חדר מקור"}
                 onChange={(event: ChangeEvent<HTMLInputElement>) =>
                   selectRoom(event.target.value)
                 }
-                sx={{ ...inputSx, opacity: source.orgScopeId ? 1 : 0.65 }}
+                sx={{
+                  ...inputSx,
+                  opacity: source.orgScopeId ? 1 : 0.65,
+                  display: "block",
+                  width: "100%",
+                  boxSizing: "border-box",
+                }}
               />
               <datalist id="source-rooms">
-                {rooms.map((room) => (
-                  <option key={room.roomId} value={room.roomId}>
-                    {room.description ?? undefined}
+                {rooms.map((r) => (
+                  <option key={r.roomId} value={r.roomId}>
+                    {r.description ?? undefined}
                   </option>
                 ))}
               </datalist>
@@ -1177,11 +1196,12 @@ export default function PackingUnitPage({
                                     type="number"
                                     min={1}
                                     max={item.quantity}
-                                    value={selected[item.id]}
+                                    value={rawQuantities[item.id] ?? String(selected[item.id])}
                                     aria-label={`כמות ${item.description}`}
                                     onChange={(
                                       event: ChangeEvent<HTMLInputElement>,
                                     ) => updateQuantity(item, event)}
+                                    onBlur={() => commitQuantity(item)}
                                     sx={{
                                       ...inputSx,
                                       width: 70,
