@@ -67,9 +67,7 @@ const ADMIN_CARDS: ActionCardItem[] = [
   { label: "ניהול משתמשים", route: "admin", Icon: Users },
 ];
 
-const POC_CARDS: ActionCardItem[] = [
-  { label: "דשבורד קישור", route: "poc", Icon: BarChart3 },
-];
+const POC_CARDS: ActionCardItem[] = [];
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "מנהל",
@@ -111,10 +109,8 @@ export default function LogisticsMainMenu({
   const cards = baseCards;
   const roleCards: ActionCardItem[] =
     user.role === "admin"
-      ? [ADMIN_CARDS[0], POC_CARDS[0]]
-      : user.role === "poc"
-        ? [POC_CARDS[0]]
-        : [];
+      ? [...ADMIN_CARDS]
+      : [];
 
   const handleTabChange = (
     _: React.MouseEvent<HTMLElement>,
@@ -133,7 +129,7 @@ export default function LogisticsMainMenu({
         dir="rtl"
         sx={{
           width: "100vw",
-          height: "100dvh",
+          height: "calc(100dvh - 62px)",
           position: "relative",
           backgroundImage: "url(/desert-bg.jpg)",
           backgroundSize: "cover",

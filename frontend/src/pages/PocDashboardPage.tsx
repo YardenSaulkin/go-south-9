@@ -17,7 +17,7 @@ import {
 } from '@mui/material'
 import { ArrowRight, ChevronDown, CheckCircle, Clock } from 'lucide-react'
 import { navigate } from '../navigation'
-import { fetchPocDashboard, verifyShipment, type PocDashboard, type PocShipment } from '../lib/api'
+import { fetchPocDashboard, confirmShipmentArrival, type PocDashboard, type PocShipment } from '../lib/api'
 import { useCurrentUser } from '../auth/useCurrentUser'
 
 const theme = createTheme({
@@ -29,12 +29,12 @@ const STATUS_LABEL: Record<string, string> = {
   // shipment
   not_sent: 'טרם נשלח',
   sent: 'בדרך',
-  arrived: 'הגיע — ממתין לאימות',
+  arrived: 'ממתין לאישור',
   verified: 'מאומת',
   // packing unit / item
   assigned_to_shipment: 'שויך להובלה',
   in_transit: 'בדרך',
-  arrived_pending_verification: 'הגיע — ממתין לאימות',
+  arrived_pending_verification: 'ממתין לאישור',
 }
 
 // PU status that is "normal" given the shipment status — don't show chip for these
@@ -63,10 +63,12 @@ function ShipmentCard({
   shipment,
   onVerify,
   verifying,
+  unitCode,
 }: {
   shipment: PocShipment
   onVerify?: () => void
   verifying: boolean
+  unitCode?: string
 }) {
   return (
     <Accordion
@@ -79,18 +81,29 @@ function ShipmentCard({
       }}
     >
       <AccordionSummary expandIcon={<ChevronDown size={18} />}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%', pr: 1 }}>
-          <Chip
-            label={STATUS_LABEL[shipment.status] ?? shipment.status}
-            color={STATUS_COLOR[shipment.status] ?? 'default'}
-            size="small"
-            sx={{ fontFamily: 'Heebo, sans-serif' }}
-          />
-          <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontWeight: 600, flexGrow: 1 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', pr: 1, pl: 1, gap: 0.75 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+            <Chip
+              label={STATUS_LABEL[shipment.status] ?? shipment.status}
+              color={STATUS_COLOR[shipment.status] ?? 'default'}
+              size="small"
+              sx={{ fontFamily: 'Heebo, sans-serif' }}
+            />
+            {shipment.status === 'verified' && (
+              <CheckCircle size={16} color="#4caf50" />
+            )}
+          </Box>
+          <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontWeight: 600 }}>
             {shipment.description}
           </Typography>
+          {unitCode && (
+            <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontSize: '0.78rem', color: '#8B5E3C' }}>
+              יחידה {unitCode}
+            </Typography>
+          )}
           {shipment.status === 'arrived' && onVerify && (
             <Button
+              fullWidth
               size="small"
               variant="contained"
               disabled={verifying}
@@ -99,14 +112,11 @@ function ShipmentCard({
                 fontFamily: 'Heebo, sans-serif',
                 bgcolor: '#8B5E3C',
                 '&:hover': { bgcolor: '#7a5232' },
-                flexShrink: 0,
+                mt: 0.25,
               }}
             >
               {verifying ? <CircularProgress size={16} color="inherit" /> : 'אשר קבלה'}
             </Button>
-          )}
-          {shipment.status === 'verified' && (
-            <CheckCircle size={18} color="#4caf50" />
           )}
         </Box>
       </AccordionSummary>
@@ -164,7 +174,7 @@ export default function PocDashboardPage({ userId }: Props) {
     setLoading(true)
     fetchPocDashboard(userId)
       .then(setDashboard)
-      .catch((e) => setError(e instanceof Error ? e.message : 'שגיאה בטעינת הדשבורד'))
+      .catch((e) => setError(e instanceof Error ? e.message : 'שגיאה בטעינת המעקב'))
       .finally(() => setLoading(false))
   }
 
@@ -174,7 +184,7 @@ export default function PocDashboardPage({ userId }: Props) {
     if (!userId) return
     setVerifying(shipmentId)
     try {
-      await verifyShipment(shipmentId, userId)
+      await confirmShipmentArrival(shipmentId, userId)
       load()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'שגיאה באימות הובלה')
@@ -185,7 +195,7 @@ export default function PocDashboardPage({ userId }: Props) {
 
   return (
     <ThemeProvider theme={theme}>
-      <Box dir="rtl" sx={{ minHeight: '100dvh', bgcolor: '#f5f0eb', p: 3 }}>
+      <Box dir="rtl" sx={{ minHeight: 'calc(100dvh - 62px)', bgcolor: '#f5f0eb', p: 3 }}>
         {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
           <IconButton onClick={() => navigate('/menu')} size="small">
@@ -195,7 +205,7 @@ export default function PocDashboardPage({ userId }: Props) {
             variant="h5"
             sx={{ fontFamily: 'Heebo, sans-serif', fontWeight: 700, color: '#2d1b0a' }}
           >
-            {currentUser?.role === 'admin' ? 'דשבורד לוגיסטיקה' : 'דשבורד קצין קישור'}
+            מעקב לוגיסטיקה
           </Typography>
         </Box>
 
@@ -222,26 +232,20 @@ export default function PocDashboardPage({ userId }: Props) {
                   ממתינות לאישור ({dashboard.pending.length})
                 </Typography>
               </Box>
-              {!dashboard.unitNames && (
-                dashboard.pending.length === 0 ? (
-                  <Typography sx={{ fontFamily: 'Heebo, sans-serif', color: 'text.secondary' }}>
-                    אין הובלות הממתינות לאישור
-                  </Typography>
-                ) : (
-                  dashboard.pending.map((s) => (
-                    <ShipmentCard
-                      key={s.id}
-                      shipment={s}
-                      onVerify={() => handleVerify(s.id)}
-                      verifying={verifying === s.id}
-                    />
-                  ))
-                )
-              )}
-              {dashboard.unitNames && dashboard.pending.length === 0 && (
+              {dashboard.pending.length === 0 ? (
                 <Typography sx={{ fontFamily: 'Heebo, sans-serif', color: 'text.secondary' }}>
                   אין הובלות הממתינות לאישור
                 </Typography>
+              ) : (
+                dashboard.pending.map((s) => (
+                  <ShipmentCard
+                    key={s.id}
+                    shipment={s}
+                    onVerify={currentUser?.role !== 'admin' ? () => handleVerify(s.id) : undefined}
+                    verifying={verifying === s.id}
+                    unitCode={currentUser?.role === 'admin' ? (s.orgScope.orgCode?.substring(0, 2) ?? undefined) : undefined}
+                  />
+                ))
               )}
             </Paper>
 
@@ -255,51 +259,49 @@ export default function PocDashboardPage({ userId }: Props) {
                   if (!grouped.has(code)) grouped.set(code, [])
                   grouped.get(code)!.push(s)
                 }
-                return Array.from(grouped.entries()).map(([code, ships]) => (
-                  <Box key={code} sx={{ mb: 3 }}>
+                return Array.from(grouped.entries()).flatMap(([code, ships]) => {
+                  const nonPending = ships.filter((s) => s.status !== 'sent')
+                  if (nonPending.length === 0) return []
+                  return [(
+                    <Box key={code} sx={{ mb: 3 }}>
+                      <Typography
+                        sx={{ fontFamily: 'Heebo, sans-serif', fontWeight: 700, color: '#2d1b0a', mb: 0.5 }}
+                      >
+                        {unitNames[code] ?? code}
+                      </Typography>
+                      <Divider sx={{ mb: 1.5, borderColor: 'rgba(139,94,60,0.3)' }} />
+                      {nonPending.map((s) => (
+                        <ShipmentCard
+                          key={s.id}
+                          shipment={s}
+                          verifying={verifying === s.id}
+                        />
+                      ))}
+                    </Box>
+                  )]
+                })
+              })()
+            ) : (
+              /* POC view — flat list (arrived are already shown in the pending section above) */
+              <>
+                {dashboard.shipments.filter((s) => s.status !== 'sent').length > 0 && (
+                  <>
                     <Typography
-                      sx={{ fontFamily: 'Heebo, sans-serif', fontWeight: 700, color: '#2d1b0a', mb: 0.5 }}
+                      sx={{ fontFamily: 'Heebo, sans-serif', fontWeight: 700, color: '#2d1b0a', mb: 1.5 }}
                     >
-                      {unitNames[code] ?? code}
+                      כל ההובלות ({dashboard.shipments.filter((s) => s.status !== 'sent').length})
                     </Typography>
-                    <Divider sx={{ mb: 1.5, borderColor: 'rgba(139,94,60,0.3)' }} />
-                    {ships
-                      .filter((s) => s.status === 'arrived')
+                    {dashboard.shipments
+                      .filter((s) => s.status !== 'sent')
                       .map((s) => (
                         <ShipmentCard
                           key={s.id}
                           shipment={s}
-                          onVerify={() => handleVerify(s.id)}
                           verifying={verifying === s.id}
                         />
                       ))}
-                    {ships.map((s) => (
-                      <ShipmentCard
-                        key={`all-${s.id}`}
-                        shipment={s}
-                        onVerify={s.status === 'arrived' ? () => handleVerify(s.id) : undefined}
-                        verifying={verifying === s.id}
-                      />
-                    ))}
-                  </Box>
-                ))
-              })()
-            ) : (
-              /* POC view — flat list */
-              <>
-                <Typography
-                  sx={{ fontFamily: 'Heebo, sans-serif', fontWeight: 700, color: '#2d1b0a', mb: 1.5 }}
-                >
-                  כל ההובלות ({dashboard.shipments.length})
-                </Typography>
-                {dashboard.shipments.map((s) => (
-                  <ShipmentCard
-                    key={s.id}
-                    shipment={s}
-                    onVerify={s.status === 'arrived' ? () => handleVerify(s.id) : undefined}
-                    verifying={verifying === s.id}
-                  />
-                ))}
+                  </>
+                )}
               </>
             )}
           </Box>

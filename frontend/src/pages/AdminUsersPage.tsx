@@ -68,7 +68,7 @@ export default function AdminUsersPage({ userId }: Props) {
 
   return (
     <ThemeProvider theme={theme}>
-      <Box dir="rtl" sx={{ minHeight: '100dvh', bgcolor: '#f5f0eb', p: 3 }}>
+      <Box dir="rtl" sx={{ minHeight: 'calc(100dvh - 62px)', bgcolor: '#f5f0eb', p: 3 }}>
         {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
           <IconButton onClick={() => navigate('/menu')} size="small">

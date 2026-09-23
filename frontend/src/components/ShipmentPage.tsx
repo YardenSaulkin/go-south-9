@@ -104,7 +104,7 @@ function Step1({ onBack, onNext, initialType, initialPlate, initialOtherDesc }: 
       dir="rtl"
       sx={{
         width: '100vw',
-        height: '100dvh',
+        height: 'calc(100dvh - 62px)',
         position: 'relative',
         backgroundImage: 'url(/desert-bg.jpg)',
         backgroundSize: 'cover',
@@ -521,7 +521,7 @@ function Step2({ transportType, licensePlate, otherDescription, userId, orgScope
       dir="rtl"
       sx={{
         width: '100vw',
-        height: '100dvh',
+        height: 'calc(100dvh - 62px)',
         position: 'relative',
         backgroundImage: 'url(/desert-bg.jpg)',
         backgroundSize: 'cover',
