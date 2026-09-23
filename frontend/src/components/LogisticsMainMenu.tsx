@@ -164,17 +164,38 @@ export default function LogisticsMainMenu({
             gap: "2vh",
           }}
         >
-          {/* Greeting row: avatar left + text right */}
+          {/* Greeting block: avatar pinned right, greeting text beneath it */}
           <Box
             sx={{
               display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
+              flexDirection: "column",
+              // RTL column: flex-start is the right edge
+              alignItems: "flex-start",
               width: "100%",
-              gap: 1.5,
+              gap: 1,
             }}
           >
+            <Avatar
+              onClick={(e) => setMenuAnchor(e.currentTarget)}
+              aria-label="תפריט משתמש"
+              sx={{
+                width: 40,
+                height: 40,
+                flexShrink: 0,
+                cursor: "pointer",
+                WebkitTapHighlightColor: "transparent",
+                bgcolor: "rgba(139, 94, 60, 0.85)",
+                border: "2px solid rgba(255,255,255,0.55)",
+                fontSize: "1rem",
+                fontFamily: "Heebo, sans-serif",
+                fontWeight: 700,
+                backdropFilter: "blur(4px)",
+                WebkitBackdropFilter: "blur(4px)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+              }}
+            >
+              {getInitials(user.name)}
+            </Avatar>
             <Box
               sx={{
                 display: "flex",
@@ -211,33 +232,12 @@ export default function LogisticsMainMenu({
                 />
               )}
             </Box>
-            <Avatar
-              onClick={(e) => setMenuAnchor(e.currentTarget)}
-              aria-label="תפריט משתמש"
-              sx={{
-                width: 40,
-                height: 40,
-                flexShrink: 0,
-                cursor: "pointer",
-                WebkitTapHighlightColor: "transparent",
-                bgcolor: "rgba(139, 94, 60, 0.85)",
-                border: "2px solid rgba(255,255,255,0.55)",
-                fontSize: "1rem",
-                fontFamily: "Heebo, sans-serif",
-                fontWeight: 700,
-                backdropFilter: "blur(4px)",
-                WebkitBackdropFilter: "blur(4px)",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-              }}
-            >
-              {getInitials(user.name)}
-            </Avatar>
             <Menu
               anchorEl={menuAnchor}
               open={Boolean(menuAnchor)}
               onClose={() => setMenuAnchor(null)}
-              anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-              transformOrigin={{ vertical: "top", horizontal: "left" }}
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+              transformOrigin={{ vertical: "top", horizontal: "right" }}
               slotProps={{
                 paper: {
                   sx: { borderRadius: "14px", minWidth: 160, mt: 0.5 },
