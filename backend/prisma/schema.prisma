@@ -85,6 +85,44 @@ enum DiscrepancyStatus {
   @@map("discrepancy_status")
 }
 
+enum ReservationStatus {
+  booked
+  cancelled
+
+  @@map("reservation_status")
+}
+
+enum ReportUrgency {
+  low
+  medium
+  high
+
+  @@map("report_urgency")
+}
+
+enum ReportStatus {
+  open
+  assigned
+  in_progress
+  resolved
+
+  @@map("report_status")
+}
+
+enum ReportCategory {
+  office_equipment
+  air_conditioning
+  lighting
+  electricity
+  plumbing
+  network
+  furniture
+  cleaning
+  other
+
+  @@map("report_category")
+}
+
 model OrgScope {
   id          String        @id @default(uuid()) @db.Uuid
   scopeLevel  OrgScopeLevel @map("scope_level")
@@ -128,6 +166,8 @@ model User {
   finalizedDiscrepancies Discrepancy[]      @relation("DiscrepancyFinalizer")
   operationRequests      OperationRequest[]
   operationEvents        OperationEvent[]
+  roomReservations       RoomReservation[]
+  facilityReports        FacilityReport[]   @relation("FacilityReportReporter")
 
   @@map("users")
 }
@@ -284,4 +324,82 @@ model OperationEvent {
 
   @@index([entityType, entityId, createdAt])
   @@map("operation_events")
+}
+
+// ─── Facility mode (managing the compound after the move) ────────────────────
+
+// A shared room in the compound. Rooms are a property of the site rather than
+// of an org scope, so every signed-in user can search and book them.
+model Room {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  building    String
+  floor       String
+  capacity    Int
+  features    String[] @default([])
+  imageUrl    String?  @map("image_url")
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  reservations RoomReservation[]
+  reports      FacilityReport[]
+
+  @@index([building, floor])
+  @@map("rooms")
+}
+
+model RoomReservation {
+  id             String            @id @default(uuid()) @db.Uuid
+  roomId         String            @map("room_id") @db.Uuid
+  userId         String            @map("user_id") @db.Uuid
+  title          String?
+  attendees      Int?
+  startAt        DateTime          @map("start_at") @db.Timestamptz(6)
+  endAt          DateTime          @map("end_at") @db.Timestamptz(6)
+  status         ReservationStatus @default(booked)
+  idempotencyKey String?           @unique @map("idempotency_key")
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  room Room @relation(fields: [roomId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([roomId, startAt])
+  @@index([userId, startAt])
+  @@map("room_reservations")
+}
+
+// A "צלם וטפל" maintenance call: the photo the AI turned into a structured
+// report, plus the handling details the compound team answers on.
+model FacilityReport {
+  id                    String         @id @default(uuid()) @db.Uuid
+  reportNumber          Int            @unique @default(autoincrement()) @map("report_number")
+  objectLabel           String         @map("object_label")
+  issueDescription      String         @map("issue_description")
+  category              ReportCategory
+  urgency               ReportUrgency
+  status                ReportStatus   @default(open)
+  locationDescription   String?        @map("location_description")
+  roomId                String?        @map("room_id") @db.Uuid
+  photoDataUrl          String?        @map("photo_data_url")
+  assignedTeam          String         @map("assigned_team")
+  expectedResponseHours Int            @map("expected_response_hours")
+  aiConfidence          Float?         @map("ai_confidence")
+  aiAnalysis            Json?          @map("ai_analysis")
+  reportedByUserId      String         @map("reported_by_user_id") @db.Uuid
+  orgScopeId            String?        @map("org_scope_id") @db.Uuid
+  idempotencyKey        String?        @unique @map("idempotency_key")
+  createdAt             DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  acknowledgedAt        DateTime?      @map("acknowledged_at") @db.Timestamptz(6)
+  resolvedAt            DateTime?      @map("resolved_at") @db.Timestamptz(6)
+
+  room       Room? @relation(fields: [roomId], references: [id])
+  reportedBy User  @relation("FacilityReportReporter", fields: [reportedByUserId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([reportedByUserId, createdAt])
+  @@map("facility_reports")
 }
