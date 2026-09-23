@@ -41,7 +41,7 @@ export class PocService {
       orderBy: { createdAt: 'desc' },
     });
 
-    const pending = shipments.filter((s) => s.status === ShipmentStatus.arrived);
+    const pending = shipments.filter((s) => s.status === ShipmentStatus.sent);
     const verified = shipments.filter((s) => s.status === ShipmentStatus.verified);
 
     const isAdmin = user.access.canViewGlobalShipmentsDashboard;
@@ -49,7 +49,10 @@ export class PocService {
     return { shipments, pending, verified, unitNames: isAdmin ? {} : undefined };
   }
 
-  async verifyShipment(user: CurrentUser, shipmentId: string) {
+  // Marks a shipment and all its packing units / items as arrived_pending_verification
+  // so they appear in the distribution (פיזור) flow. The shipment auto-verifies
+  // once every packing unit is fully distributed.
+  async confirmArrival(user: CurrentUser, shipmentId: string) {
     const shipment = await db.shipment.findUnique({
       where: { id: shipmentId },
       include: {
@@ -60,32 +63,18 @@ export class PocService {
     if (!shipment) throw new NotFoundException('ההובלה לא נמצאה');
 
     assertCanApproveShipment(user.access, shipment.orgScope.orgCode ?? null);
-    assertShipmentTransition(shipment.status, ShipmentStatus.verified);
+    assertShipmentTransition(shipment.status, ShipmentStatus.arrived);
 
     await db.$transaction(
       async (tx) => {
-        for (const pu of shipment.packingUnits) {
-          if (pu.status === PackingUnitStatus.arrived_pending_verification) {
-            await tx.packingUnit.update({
-              where: { id: pu.id },
-              data: { status: PackingUnitStatus.verified },
-            });
-            await tx.item.updateMany({
-              where: {
-                packingUnitId: pu.id,
-                status: ItemStatus.arrived_pending_verification,
-              },
-              data: { status: ItemStatus.verified },
-            });
-          }
-        }
-
+        // Only mark the shipment as arrived — packing units stay in_transit
+        // until קבלת ציוד (receiving) is done by the normal user.
         const updatedShipment = await tx.shipment.updateMany({
-          where: { id: shipmentId, status: ShipmentStatus.arrived },
-          data: { status: ShipmentStatus.verified },
+          where: { id: shipmentId, status: ShipmentStatus.sent },
+          data: { status: ShipmentStatus.arrived },
         });
         if (updatedShipment.count !== 1) {
-          throw new ConflictException('ההובלה כבר אומתה או שונתה. יש לרענן.');
+          throw new ConflictException('ההובלה כבר עודכנה או שונתה. יש לרענן.');
         }
 
         await tx.operationEvent.create({
@@ -93,9 +82,9 @@ export class PocService {
             actorUserId: user.id,
             entityType: 'shipment',
             entityId: shipmentId,
-            action: 'poc_verified',
+            action: 'poc_confirmed_arrival',
             previousState: { status: shipment.status },
-            nextState: { status: ShipmentStatus.verified },
+            nextState: { status: ShipmentStatus.arrived },
           },
         });
       },
@@ -103,5 +92,41 @@ export class PocService {
     );
 
     return { success: true };
+  }
+
+  // After receiving (קבלת ציוד), the POC reviews packages and signs off
+  // before distribution (פיזור ציוד) can begin.
+  // Does not change statuses — packages stay arrived_pending_verification
+  // so the distribution service can pick them up.
+  async confirmPackages(user: CurrentUser, shipmentId: string) {
+    const shipment = await db.shipment.findUnique({
+      where: { id: shipmentId },
+      include: { orgScope: true, packingUnits: true },
+    });
+    if (!shipment) throw new NotFoundException('ההובלה לא נמצאה');
+    if (shipment.status !== ShipmentStatus.arrived) {
+      throw new ConflictException('ניתן לאשר אריזות רק עבור הובלה שהגיעה');
+    }
+    assertCanApproveShipment(user.access, shipment.orgScope.orgCode ?? null);
+
+    const arrivedCount = shipment.packingUnits.filter(
+      (pu) => pu.status === PackingUnitStatus.arrived_pending_verification,
+    ).length;
+    if (arrivedCount === 0) {
+      throw new ConflictException('אין אריזות שקיבלו קליטה עדיין');
+    }
+
+    await db.operationEvent.create({
+      data: {
+        actorUserId: user.id,
+        entityType: 'shipment',
+        entityId: shipmentId,
+        action: 'poc_confirmed_packages',
+        previousState: { arrivedPackages: arrivedCount },
+        nextState: { approvedForDistribution: true },
+      },
+    });
+
+    return { success: true, approvedPackages: arrivedCount };
   }
 }

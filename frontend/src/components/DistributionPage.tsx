@@ -13,18 +13,15 @@ import {
   ChevronRight,
   Search,
   X,
-  Truck,
-  Package,
-  Home,
   Minus,
   Plus,
   CheckCircle2,
 } from 'lucide-react'
+import BottomNavBar from './BottomNavBar'
 import CardboardBoxSvg from './distribution/CardboardBoxSvg'
 import {
   fetchDistributionPackingUnits,
   distributePackingUnit,
-  FALLBACK_DISTRIBUTION_PACKAGES,
   type DistributionPackingUnit,
 } from '../lib/api'
 import { navigate } from '../navigation'
@@ -52,66 +49,6 @@ const FILTER_FIELD_OPTIONS: { id: FilterField; label: string }[] = [
 
 // ─── Shared Bottom Navigation Bar ──────────────────────────────────────────
 
-function BottomNavBar({ active = 'distribution' }: { active?: string }) {
-  return (
-    <Box
-      sx={{
-        position: 'relative',
-        zIndex: 10,
-        height: '62px',
-        backgroundColor: '#cd7937',
-        borderTop: '1px solid rgba(0,0,0,0.12)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-around',
-        px: 2,
-        flexShrink: 0,
-        boxShadow: '0 -2px 10px rgba(0,0,0,0.15)',
-      }}
-    >
-      {/* Truck icon */}
-      <IconButton
-        onClick={() => navigate('/transport')}
-        sx={{
-          color: active === 'transport' ? '#2d1604' : '#3f2108',
-          p: 1.2,
-          '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
-        }}
-        title="הובלות"
-      >
-        <Truck size={28} strokeWidth={1.8} />
-      </IconButton>
-
-      {/* Box icon */}
-      <IconButton
-        onClick={() => navigate('/distribution')}
-        sx={{
-          color: active === 'distribution' ? '#2d1604' : '#3f2108',
-          p: 1.2,
-          backgroundColor: active === 'distribution' ? 'rgba(255,255,255,0.2)' : 'transparent',
-          borderRadius: '12px',
-          '&:hover': { backgroundColor: 'rgba(255,255,255,0.3)' },
-        }}
-        title="פיזור ציוד"
-      >
-        <Package size={28} strokeWidth={1.8} />
-      </IconButton>
-
-      {/* Home icon */}
-      <IconButton
-        onClick={() => navigate('/menu')}
-        sx={{
-          color: active === 'home' ? '#2d1604' : '#3f2108',
-          p: 1.2,
-          '&:hover': { backgroundColor: 'rgba(0,0,0,0.06)' },
-        }}
-        title="תפריט ראשי"
-      >
-        <Home size={28} strokeWidth={1.8} />
-      </IconButton>
-    </Box>
-  )
-}
 
 // ─── Sub-view 1: Packages List View (Right page in mockup) ──────────────────
 
@@ -176,7 +113,7 @@ function PackagesListView({
       dir="rtl"
       sx={{
         width: '100vw',
-        height: '100dvh',
+        height: 'calc(100dvh - 62px)',
         position: 'relative',
         backgroundImage: 'url(/desert-bg.jpg)',
         backgroundSize: 'cover',
@@ -407,7 +344,7 @@ function PackagesListView({
 
             const srcLines = pkg.sourceDescription
               ? pkg.sourceDescription.split('|').map((s) => s.trim())
-              : ['יחידת מצו"ב', 'ענף חוכמה', 'מדור מוח', 'חדר 208']
+              : []
 
             const packer =
               pkg.packerName ||
@@ -624,7 +561,7 @@ function PackagesListView({
       </Box>
 
       {/* Bottom Bar */}
-      <BottomNavBar active="distribution" />
+      <BottomNavBar active="packing-units" />
     </Box>
   )
 }
@@ -743,7 +680,7 @@ function PackageItemsView({
       dir="rtl"
       sx={{
         width: '100vw',
-        height: '100dvh',
+        height: 'calc(100dvh - 62px)',
         position: 'relative',
         backgroundImage: 'url(/desert-bg.jpg)',
         backgroundSize: 'cover',
@@ -1124,7 +1061,7 @@ function PackageItemsView({
       </Box>
 
       {/* Bottom Bar */}
-      <BottomNavBar active="distribution" />
+      <BottomNavBar active="packing-units" />
 
       {/* Toast */}
       <Snackbar
@@ -1161,19 +1098,13 @@ export default function DistributionPage({
   const [selectedPackage, setSelectedPackage] = useState<DistributionPackingUnit | null>(null)
 
   const loadPackages = useCallback(async () => {
+    if (!userId) return
     setLoading(true)
     try {
-      if (userId) {
-        const data = await fetchDistributionPackingUnits(orgScopeId, userId)
-        if (data && data.length > 0) {
-          setPackages(data)
-          return
-        }
-      }
-      setPackages(FALLBACK_DISTRIBUTION_PACKAGES)
+      const data = await fetchDistributionPackingUnits(orgScopeId, userId)
+      setPackages(data)
     } catch (err) {
-      console.warn('Falling back to default distribution packages:', err)
-      setPackages(FALLBACK_DISTRIBUTION_PACKAGES)
+      console.error('Failed to load distribution packages:', err)
     } finally {
       setLoading(false)
     }

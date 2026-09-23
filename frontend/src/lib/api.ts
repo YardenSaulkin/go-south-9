@@ -204,15 +204,46 @@ export async function fetchPocDashboard(userId: string): Promise<PocDashboard> {
   return res.json()
 }
 
-export async function verifyShipment(shipmentId: string, userId: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/api/poc/shipments/${shipmentId}/verify`, {
+export async function confirmShipmentArrival(shipmentId: string, userId: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/poc/shipments/${shipmentId}/confirm-arrival`, {
     method: 'POST',
     headers: headers(userId),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error((err as { message?: string }).message ?? `Verification failed: ${res.status}`)
+    throw new Error((err as { message?: string }).message ?? `Confirmation failed: ${res.status}`)
   }
+}
+
+// ─── Shipments Status (סטטוס הובלות) — all roles ─────────────────────────────
+
+export async function fetchShipmentsStatus(userId: string): Promise<PocDashboard> {
+  const res = await fetch(`${BASE_URL}/api/status/shipments`, { headers: headers(userId) })
+  if (!res.ok) throw new Error(`Failed to fetch shipments status: ${res.status}`)
+  return res.json()
+}
+
+// ─── Packing Units Status (סטטוס אריזות) ─────────────────────────────────────
+
+export interface StatusPackingUnit {
+  id: string
+  serialNumber: number | null
+  displaySerial: string
+  description: string
+  status: string
+  packingUnitType: string | null
+  orgScope?: { mador: string; orgCode: string | null } | null
+}
+
+export interface PackingUnitsStatus {
+  packingUnits: StatusPackingUnit[]
+  unitNames?: Record<string, string>
+}
+
+export async function fetchPackingUnitsStatus(userId: string): Promise<PackingUnitsStatus> {
+  const res = await fetch(`${BASE_URL}/api/status/packing-units`, { headers: headers(userId) })
+  if (!res.ok) throw new Error(`Failed to fetch packing units status: ${res.status}`)
+  return res.json()
 }
 
 // ─── Distribution (פיזור ציוד) ────────────────────────────────────────────────
@@ -237,10 +268,7 @@ export interface DistributionPackingUnit {
   items: DistributionItem[]
   orgScope?: {
     id?: string
-    unit: string | null
-    anaf: string | null
     mador: string
-    team: string | null
   } | null
   createdBy?: {
     firstName?: string | null
@@ -256,72 +284,6 @@ export interface DistributePayload {
   items: { itemId: string; actualQuantity: number }[]
 }
 
-export const FALLBACK_DISTRIBUTION_PACKAGES: DistributionPackingUnit[] = [
-  {
-    id: 'pkg-55555-1',
-    serialNumber: 55555,
-    displaySerial: '55555',
-    description: 'עמדות עבודה מחשוב',
-    status: 'arrived_pending_verification',
-    packingUnitType: 'קרטון אחיד',
-    sourceDescription: 'יחידת מצו"ב | ענף חוכמה | מדור מוח | חדר 208',
-    destinationDescription: JSON.stringify({ building: 'בניין A', floor: 'קומה 3', room: 'חדר 309' }),
-    packerName: 'שימי שמעוני',
-    orgScope: { unit: 'יחידת מצו"ב', anaf: 'ענף חוכמה', mador: 'מדור מוח', team: null },
-    items: [
-      { id: 'item-pc-1', description: 'מחשב', quantity: 4, distributedQuantity: 0, status: 'arrived_pending_verification' },
-      { id: 'item-screen-1', description: 'מסך מחשב', quantity: 4, distributedQuantity: 0, status: 'arrived_pending_verification' },
-    ],
-  },
-  {
-    id: 'pkg-55555-2',
-    serialNumber: 55555,
-    displaySerial: '55555',
-    description: 'ציוד תקשורת היקפי',
-    status: 'arrived_pending_verification',
-    packingUnitType: 'קרטון מקוטע',
-    sourceDescription: 'יחידת מצו"ב | ענף חוכמה | מדור מוח | חדר 208',
-    destinationDescription: JSON.stringify({ building: 'בניין A', floor: 'קומה 3', room: 'חדר 309' }),
-    packerName: 'שימי שמעוני',
-    orgScope: { unit: 'יחידת מצו"ב', anaf: 'ענף חוכמה', mador: 'מדור מוח', team: null },
-    items: [
-      { id: 'item-switch-1', description: 'מתג רשת 24 פורטים', quantity: 2, distributedQuantity: 0, status: 'arrived_pending_verification' },
-      { id: 'item-cable-1', description: 'כבלי רשת מוגנים', quantity: 12, distributedQuantity: 0, status: 'arrived_pending_verification' },
-    ],
-  },
-  {
-    id: 'pkg-55555-3',
-    serialNumber: 55555,
-    displaySerial: '55555',
-    description: 'ציוד משרדי ואלקטרוניקה',
-    status: 'arrived_pending_verification',
-    packingUnitType: 'קרטון אחיד',
-    sourceDescription: 'יחידת מצו"ב | ענף חוכמה | מדור מוח | חדר 208',
-    destinationDescription: JSON.stringify({ building: 'בניין A', floor: 'קומה 3', room: 'חדר 309' }),
-    packerName: 'שימי שמעוני',
-    orgScope: { unit: 'יחידת מצו"ב', anaf: 'ענף חוכמה', mador: 'מדור מוח', team: null },
-    items: [
-      { id: 'item-dock-1', description: 'תחנת עגינה Type-C', quantity: 4, distributedQuantity: 0, status: 'arrived_pending_verification' },
-      { id: 'item-power-1', description: 'מפצל מתח מוגן', quantity: 4, distributedQuantity: 0, status: 'arrived_pending_verification' },
-    ],
-  },
-  {
-    id: 'pkg-55555-4',
-    serialNumber: 55555,
-    displaySerial: '55555',
-    description: 'אביזרי קצה ואוזניות',
-    status: 'arrived_pending_verification',
-    packingUnitType: 'קרטון אחיד',
-    sourceDescription: 'יחידת מצו"ב | ענף חוכמה | מדור מוח | חדר 208',
-    destinationDescription: JSON.stringify({ building: 'בניין A', floor: 'קומה 3', room: 'חדר 309' }),
-    packerName: 'שימי שמעוני',
-    orgScope: { unit: 'יחידת מצו"ב', anaf: 'ענף חוכמה', mador: 'מדור מוח', team: null },
-    items: [
-      { id: 'item-headset-1', description: 'אוזניות ראש', quantity: 4, distributedQuantity: 0, status: 'arrived_pending_verification' },
-      { id: 'item-mouse-1', description: 'עכבר אלחוטי', quantity: 4, distributedQuantity: 0, status: 'arrived_pending_verification' },
-    ],
-  },
-]
 
 export async function fetchDistributionPackingUnits(
   orgScopeId: string | null,
