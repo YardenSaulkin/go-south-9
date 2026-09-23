@@ -35,7 +35,6 @@ type NavigateRoute =
 
 const PUBLIC_ROUTES = ["/home", "/login", "/signup"];
 
-const FALLBACK_USER = { name: "דני", personalNumber: "1234567", role: "מפקד" };
 
 export default function App() {
   const pathname = usePathname();
