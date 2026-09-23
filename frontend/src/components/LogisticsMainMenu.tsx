@@ -53,6 +53,8 @@ export interface MainMenuProps {
   // Entry point into facility mode — managing the compound after the move.
   onEnterFacilityMode: () => void;
   onLogout: () => void;
+  activeTab?: TabValue;
+  onTabChange?: (tab: TabValue) => void;
 }
 
 const SENDING_CARDS: ActionCardItem[] = [
@@ -99,8 +101,10 @@ export default function LogisticsMainMenu({
   onNavigate,
   onEnterFacilityMode,
   onLogout,
+  activeTab: activeTabProp,
+  onTabChange,
 }: MainMenuProps) {
-  const [activeTab, setActiveTab] = useState<TabValue>("sending");
+  const [activeTab, setActiveTab] = useState<TabValue>(activeTabProp ?? "sending");
   const [animKey, setAnimKey] = useState(0);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
 
@@ -119,6 +123,7 @@ export default function LogisticsMainMenu({
   ) => {
     if (val && val !== activeTab) {
       setActiveTab(val);
+      onTabChange?.(val);
       setAnimKey((k) => k + 1);
     }
   };

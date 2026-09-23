@@ -194,7 +194,7 @@ export default function ShipmentsStatusPage({ userId }: Props) {
     <ThemeProvider theme={theme}>
       <Box
         dir="rtl"
-        sx={{ minHeight: 'calc(100dvh - 62px)', bgcolor: '#f5f0eb', display: 'flex', flexDirection: 'column' }}
+        sx={{ height: 'calc(100dvh - 62px)', bgcolor: '#f5f0eb', display: 'flex', flexDirection: 'column' }}
       >
         <Box sx={{ flex: 1, p: 3, overflowY: 'auto' }}>
           <Typography
@@ -260,11 +260,14 @@ export default function ShipmentsStatusPage({ userId }: Props) {
                     if (nonPending.length === 0) return []
                     return [(
                       <Box key={code} sx={{ mb: 3 }}>
-                        <Typography
-                          sx={{ fontFamily: 'Heebo, sans-serif', fontWeight: 700, color: '#2d1b0a', mb: 0.5 }}
-                        >
-                          {unitNames[code] ?? code}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontWeight: 700, color: '#2d1b0a' }}>
+                            יחידה {unitNames[code] ?? code}
+                          </Typography>
+                          <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontSize: '0.85rem', color: '#8B5E3C' }}>
+                            כמות: {nonPending.length}
+                          </Typography>
+                        </Box>
                         <Divider sx={{ mb: 1.5, borderColor: 'rgba(139,94,60,0.3)' }} />
                         {nonPending.map((s) => (
                           <ShipmentCard

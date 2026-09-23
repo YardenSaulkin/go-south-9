@@ -1,676 +1,1707 @@
-import { useState } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import {
   Box,
-  Typography,
-  IconButton,
+  Button,
   Checkbox,
+  createTheme,
+  IconButton,
   Menu,
   MenuItem,
   Snackbar,
-  createTheme,
   ThemeProvider,
-} from '@mui/material'
-import { ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
-import PackingUnitSummaryModal from './PackingUnitSummaryModal'
+  Typography,
+} from "@mui/material";
+import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
+import { ApiError } from "../api/client";
+import {
+  packingApi,
+  type AppContext,
+  type CreatePackingUnitRequest,
+  type Destination,
+  type EligibleItem,
+  type OrgScope,
+  type PackingSuccessResponse,
+  type PackingUnitType,
+  type SourceRoom,
+  type SourceRoomDetails,
+} from "../api/packing";
+import { packingUnitStatusLabels } from "../statusLabels";
 
 const theme = createTheme({
-  direction: 'rtl',
-  typography: { fontFamily: 'Heebo, sans-serif' },
-})
+  direction: "rtl",
+  typography: { fontFamily: "Heebo, sans-serif" },
+});
 
-interface PackingUnit {
-  id: number
-  name: string
-  count: number
-  expanded: boolean
-  subItems: { id: string; checked: boolean }[]
+const TYPE_OPTIONS: Array<{ value: PackingUnitType; label: string }> = [
+  { value: "professional_carton", label: "קרטון מקצועי" },
+  { value: "personal_carton", label: "קרטון אישי" },
+  { value: "pallet", label: "משטח" },
+  { value: "dolav", label: "דולב" },
+  { value: "bulk", label: "תפזורת" },
+];
+
+export interface PackingDraft {
+  orgScopeId: string;
+  unit: string;
+  anaf: string;
+  mador: string;
+  team: string;
+  roomId: string;
+  sourceDescription: string;
+  destinationMode: "existing" | "new";
+  destinationId: string;
+  destinationDescription: string;
+  building: string;
+  floor: string;
+  destinationRoom: string;
 }
 
-const PACKAGING_TYPES = ['קרטון מקוטע', 'קרטון אחיד', 'פלסטיק', 'זולב', 'תולדות']
-const ROOMS = ['חדר 1', 'חדר 2', 'חדר 3']
-const WAREHOUSES = ['מחסן א׳', 'מחסן ב׳', 'מחסן ג׳']
-const FLOORS = ['קומה 1', 'קומה 2', 'קומה 3']
-const BUILDINGS = ['בניין א׳', 'בניין ב׳', 'בניין ג׳']
+interface SelectOption {
+  value: string;
+  label: string;
+}
+interface CustomSelectProps {
+  value: string;
+  placeholder: string;
+  options: SelectOption[];
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}
+type HierarchyField = "unit" | "anaf" | "mador" | "team";
 
-const INITIAL_ITEMS: PackingUnit[] = [
-  {
-    id: 1,
-    name: 'מחשב',
-    count: 4,
-    expanded: true,
-    subItems: [
-      { id: 'id-001', checked: false },
-      { id: 'id-002', checked: false },
-    ],
-  },
-  {
-    id: 2,
-    name: 'מסך',
-    count: 8,
-    expanded: false,
-    subItems: [
-      { id: 'id-003', checked: false },
-      { id: 'id-004', checked: false },
-    ],
-  },
-]
+const ORG_CODE_RANGES: Record<HierarchyField, [number, number]> = {
+  unit: [0, 2],
+  anaf: [2, 4],
+  mador: [4, 6],
+  team: [6, 8],
+};
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function scopeCode(scope: OrgScope, field: HierarchyField): string {
+  const explicit = scope[`${field}Code`];
+  if (explicit) return explicit;
+  if (scope.orgCode && /^\d{8}$/.test(scope.orgCode)) {
+    const [start, end] = ORG_CODE_RANGES[field];
+    return scope.orgCode.slice(start, end);
+  }
+  return scope[field] ?? "";
+}
+
+function scopeOptions(
+  scopes: OrgScope[],
+  field: HierarchyField,
+): SelectOption[] {
+  const values = new Map<string, string>();
+  for (const scope of scopes) {
+    const value = scopeCode(scope, field);
+    if (!value) continue;
+    const name = scope[field];
+    values.set(value, value);
+  }
+  return [...values].map(([value, label]) => ({ value, label }));
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
   return (
     <Typography
       sx={{
-        fontFamily: 'Heebo, sans-serif',
         fontWeight: 700,
-        fontSize: '0.95rem',
-        color: '#3d2008',
-        textAlign: 'right',
+        fontSize: "0.95rem",
+        color: "#3d2008",
+        textAlign: "right",
         mb: 1,
       }}
     >
       {children}
     </Typography>
-  )
+  );
 }
 
-interface CustomSelectProps {
-  value: string
-  placeholder: string
-  options: string[]
-  onChange: (val: string) => void
-}
-
-function CustomSelect({ value, placeholder, options, onChange }: CustomSelectProps) {
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
-  const open = Boolean(anchorEl)
-
+function CustomSelect({
+  value,
+  placeholder,
+  options,
+  disabled,
+  onChange,
+}: CustomSelectProps) {
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const label =
+    options.find((option) => option.value === value)?.label ?? value;
   return (
     <>
       <Box
-        onClick={(e) => setAnchorEl(e.currentTarget)}
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        aria-disabled={disabled}
+        aria-label={placeholder}
+        onClick={(event) => !disabled && setAnchorEl(event.currentTarget)}
+        onKeyDown={(event) => {
+          if (!disabled && (event.key === "Enter" || event.key === " ")) {
+            event.preventDefault();
+            setAnchorEl(event.currentTarget as HTMLElement);
+          }
+        }}
         sx={{
-          backgroundColor: 'rgba(246, 230, 195, 0.85)',
-          border: '1px solid rgba(200, 160, 100, 0.4)',
-          borderRadius: '12px',
-          px: '14px',
-          py: '10px',
-          fontFamily: 'Heebo, sans-serif',
-          fontSize: '0.9rem',
-          color: value ? '#3d2008' : '#b08060',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          userSelect: 'none',
-          WebkitTapHighlightColor: 'transparent',
+          backgroundColor: disabled
+            ? "rgba(230,218,194,.62)"
+            : "rgba(246,230,195,.85)",
+          border: "1px solid rgba(200,160,100,.4)",
+          borderRadius: "12px",
+          px: "14px",
+          py: "10px",
+          minHeight: 44,
+          fontSize: ".9rem",
+          color: value ? "#3d2008" : "#b08060",
+          cursor: disabled ? "default" : "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          userSelect: "none",
+          outline: "none",
+          "&:focus-visible": { outline: "3px solid #1f5e78", outlineOffset: 2 },
         }}
       >
-        <ChevronDown size={16} color="#8B5E3C" style={{ flexShrink: 0 }} />
-        <span style={{ textAlign: 'right', flex: 1 }}>{value || placeholder}</span>
+        <ChevronDown size={16} color="#8B5E3C" />
+        <span style={{ textAlign: "right", flex: 1 }}>
+          {label || placeholder}
+        </span>
       </Box>
       <Menu
         anchorEl={anchorEl}
-        open={open}
+        open={Boolean(anchorEl)}
         onClose={() => setAnchorEl(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
         slotProps={{
           paper: {
             sx: {
-              mt: '4px',
-              borderRadius: '12px',
-              backgroundColor: 'rgba(246, 230, 195, 0.97)',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-              border: '1px solid rgba(200, 160, 100, 0.4)',
+              mt: 0.5,
+              borderRadius: "12px",
+              backgroundColor: "rgba(246,230,195,.97)",
               minWidth: 140,
-              overflow: 'hidden',
             },
           },
         }}
       >
-        {options.map((opt) => (
+        {options.map((option) => (
           <MenuItem
-            key={opt}
+            key={option.value}
+            selected={option.value === value}
             onClick={() => {
-              onChange(opt)
-              setAnchorEl(null)
+              onChange(option.value);
+              setAnchorEl(null);
             }}
-            selected={opt === value}
             sx={{
-              fontFamily: 'Heebo, sans-serif',
-              fontSize: '0.9rem',
-              color: '#3d2008',
-              justifyContent: 'flex-end',
-              direction: 'rtl',
-              py: '10px',
-              px: '16px',
-              '&.Mui-selected': {
-                backgroundColor: 'rgba(139, 94, 60, 0.15)',
+              justifyContent: "flex-end",
+              direction: "rtl",
+              "&.Mui-selected": {
+                backgroundColor: "rgba(139,94,60,.15)",
                 fontWeight: 700,
               },
-              '&:hover': { backgroundColor: 'rgba(139, 94, 60, 0.1)' },
             }}
           >
-            {opt}
+            {option.label}
           </MenuItem>
         ))}
       </Menu>
     </>
-  )
+  );
+}
+
+const sectionCardSx = {
+  backgroundColor: "rgba(240,210,155,.65)",
+  backdropFilter: "blur(10px)",
+  WebkitBackdropFilter: "blur(10px)",
+  borderRadius: "18px",
+  p: 2,
+  border: "1px solid rgba(255,255,255,.25)",
+  boxShadow: "0 4px 18px rgba(0,0,0,.1)",
+};
+const inputSx = {
+  backgroundColor: "rgba(246,230,195,.85)",
+  border: "1px solid rgba(200,160,100,.4)",
+  borderRadius: "12px",
+  padding: "10px 14px",
+  fontFamily: "Heebo, sans-serif",
+  fontSize: ".9rem",
+  color: "#3d2008",
+  outline: "none",
+  width: "100%",
+  direction: "rtl" as const,
+  minHeight: 44,
+  "&:focus-visible": { outline: "3px solid #1f5e78", outlineOffset: 2 },
+};
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "אירעה שגיאה. נסה שוב.";
+}
+
+function BackgroundScreen({ children }: { children: ReactNode }) {
+  return (
+    <ThemeProvider theme={theme}>
+      <Box
+        dir="rtl"
+        sx={{
+          width: "100vw",
+          height: "100dvh",
+          position: "relative",
+          backgroundImage: "url(/desert-bg.jpg)",
+          backgroundSize: "cover",
+          backgroundPosition: "center top",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        <Box
+          sx={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "linear-gradient(to bottom, rgba(0,0,0,.25), transparent 50%)",
+            pointerEvents: "none",
+          }}
+        />
+        {children}
+      </Box>
+    </ThemeProvider>
+  );
 }
 
 export interface PackingUnitPageProps {
-  onBack: () => void
-  user?: { name: string; personalNumber?: string; role?: string } | null
-  orgScope?: { mador?: string } | null
+  onBack: () => void;
+  initialDraft?: PackingDraft | null;
+  onComplete: (response: PackingSuccessResponse, draft: PackingDraft) => void;
 }
 
-export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitPageProps) {
-  const [packagingType, setPackagingType] = useState('קרטון מקוטע')
-  const [items, setItems] = useState<PackingUnit[]>(INITIAL_ITEMS)
-  const [sourceText, setSourceText] = useState('')
-  const [branch, setBranch] = useState('')
-  const [room, setRoom] = useState('')
-  const [warehouse, setWarehouse] = useState('')
-  const [destText, setDestText] = useState('')
-  const [floor, setFloor] = useState('')
-  const [building, setBuilding] = useState('')
-  const [toastOpen, setToastOpen] = useState(false)
-  const [summaryOpen, setSummaryOpen] = useState(false)
-  const [serialNumber, setSerialNumber] = useState('56789')
+const EMPTY_DRAFT: PackingDraft = {
+  orgScopeId: "",
+  unit: "",
+  anaf: "",
+  mador: "",
+  team: "",
+  roomId: "",
+  sourceDescription: "",
+  destinationMode: "new",
+  destinationId: "",
+  destinationDescription: "",
+  building: "",
+  floor: "",
+  destinationRoom: "",
+};
 
-  const anyItemChecked = items.some((item) => item.subItems.some((s) => s.checked))
-  const allFilled = branch && room && warehouse && floor && building && anyItemChecked
+export default function PackingUnitPage({
+  onBack,
+  initialDraft,
+  onComplete,
+}: PackingUnitPageProps) {
+  const [context, setContext] = useState<AppContext | null>(null);
+  const [contextError, setContextError] = useState("");
+  const [source, setSource] = useState<PackingDraft>({
+    ...EMPTY_DRAFT,
+    ...initialDraft,
+  });
+  const [rooms, setRooms] = useState<SourceRoom[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(false);
+  const [sourceRoom, setSourceRoom] = useState<SourceRoomDetails | null>(null);
+  const [sourceRoomError, setSourceRoomError] = useState("");
+  const [roomLoading, setRoomLoading] = useState(false);
+  const [items, setItems] = useState<EligibleItem[]>([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
+  const [selected, setSelected] = useState<Record<string, number>>({});
+  const [rawQuantities, setRawQuantities] = useState<Record<string, string>>({});
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [packingType, setPackingType] = useState<PackingUnitType | "">("");
+  const [description, setDescription] = useState("");
+  const [descriptionEdited, setDescriptionEdited] = useState(false);
+  const [destinationMode, setDestinationMode] = useState<"existing" | "new">(
+    initialDraft?.destinationMode ?? "new",
+  );
+  const [destinationSearch, setDestinationSearch] = useState(
+    initialDraft?.destinationId ?? "",
+  );
+  const [destinationResults, setDestinationResults] = useState<Destination[]>(
+    [],
+  );
+  const [destinationLoading, setDestinationLoading] = useState(false);
+  const [destinationError, setDestinationError] = useState("");
+  const [selectedDestination, setSelectedDestination] =
+    useState<Destination | null>(
+      initialDraft?.destinationMode === "existing" && initialDraft.destinationId
+        ? {
+            id: initialDraft.destinationId,
+            description: initialDraft.destinationDescription,
+          }
+        : null,
+    );
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [toastOpen, setToastOpen] = useState(false);
+  const roomVersion = useRef(0);
+  const destinationVersion = useRef(0);
+  const idempotencyKey = useRef(crypto.randomUUID());
 
-  const toggleItem = (id: number) => {
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, expanded: !item.expanded } : item))
-    )
-  }
+  useEffect(() => {
+    let active = true;
+    packingApi
+      .getContext()
+      .then((value) => {
+        if (!active) return;
+        setContext(value);
+        const scope = value.scopes.find(
+          (candidate) => candidate.id === initialDraft?.orgScopeId,
+        );
+        if (scope)
+          setSource((current) => ({
+            ...current,
+            unit: scopeCode(scope, "unit"),
+            anaf: scopeCode(scope, "anaf"),
+            mador: scopeCode(scope, "mador"),
+            team: scopeCode(scope, "team"),
+          }));
+      })
+      .catch((reason: unknown) => {
+        if (active) setContextError(errorMessage(reason));
+      });
+    return () => {
+      active = false;
+    };
+  }, [initialDraft?.orgScopeId]);
 
-  const toggleSubItem = (itemId: number, subId: string) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              subItems: item.subItems.map((s) =>
-                s.id === subId ? { ...s, checked: !s.checked } : s
-              ),
-            }
-          : item
-      )
-    )
-  }
+  const scopes = context?.scopes ?? [];
+  const unitOptions = scopeOptions(scopes, "unit");
+  const unitScopes = scopes.filter(
+    (scope) => scopeCode(scope, "unit") === source.unit,
+  );
+  const anafOptions = scopeOptions(unitScopes, "anaf");
+  const anafScopes = unitScopes.filter(
+    (scope) => scopeCode(scope, "anaf") === source.anaf,
+  );
+  const madorOptions = scopeOptions(anafScopes, "mador");
+  const madorScopes = anafScopes.filter(
+    (scope) => scopeCode(scope, "mador") === source.mador,
+  );
+  const teamOptions = scopeOptions(madorScopes, "team");
+  const selectedScope = scopes.find((scope) => scope.id === source.orgScopeId);
+  const isPersonal = packingType === "personal_carton";
 
-  const toggleAllSubItems = (itemId: number, checkAll: boolean) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId
-          ? { ...item, subItems: item.subItems.map((s) => ({ ...s, checked: checkAll })) }
-          : item
-      )
-    )
-  }
+  const groupedItems = useMemo(() => {
+    const groups = new Map<string, EligibleItem[]>();
+    for (const item of items)
+      groups.set(item.description, [
+        ...(groups.get(item.description) ?? []),
+        item,
+      ]);
+    return [...groups];
+  }, [items]);
 
-  const handleFinish = () => {
-    if (!allFilled) {
-      setToastOpen(true)
-      return
+  const generatedDescription = useMemo(() => {
+    const quantities = new Map<string, number>();
+    for (const item of items)
+      if (selected[item.id])
+        quantities.set(
+          item.description,
+          (quantities.get(item.description) ?? 0) + selected[item.id],
+        );
+    return [...quantities]
+      .map(([name, quantity]) => `${name} × ${quantity}`)
+      .join(", ");
+  }, [items, selected]);
+
+  useEffect(() => {
+    if (!descriptionEdited && !isPersonal) setDescription(generatedDescription);
+  }, [descriptionEdited, generatedDescription, isPersonal]);
+
+  useEffect(() => {
+    if (!source.orgScopeId) {
+      setRooms([]);
+      return;
     }
-    setSummaryOpen(true)
-  }
+    let active = true;
+    setRoomsLoading(true);
+    packingApi
+      .getSourceRooms(source.orgScopeId)
+      .then((value) => {
+        if (active) setRooms(value);
+      })
+      .catch((reason: unknown) => {
+        if (active) setError(errorMessage(reason));
+      })
+      .finally(() => {
+        if (active) setRoomsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [source.orgScopeId]);
 
-  const handleContinuePacking = () => {
-    setSummaryOpen(false)
-    setItems((prev) =>
-      prev.map((item) => ({
-        ...item,
-        subItems: item.subItems.map((s) => ({ ...s, checked: false })),
-      }))
-    )
-    setSerialNumber(String(Math.floor(10000 + Math.random() * 90000)))
-  }
+  useEffect(() => {
+    const version = ++roomVersion.current;
+    setSourceRoom(null);
+    setSourceRoomError("");
+    setItems([]);
+    if (!source.orgScopeId || !source.roomId.trim()) {
+      setRoomLoading(false);
+      setItemsLoading(false);
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      setRoomLoading(true);
+      setItemsLoading(true);
+      Promise.all([
+        packingApi.getSourceRoom(source.orgScopeId, source.roomId.trim()),
+        packingApi.getEligibleItems(source.orgScopeId, source.roomId.trim()),
+      ])
+        .then(([room, eligibleItems]) => {
+          if (version !== roomVersion.current) return;
+          setSourceRoom(room);
+          setSource((current) => ({
+            ...current,
+            sourceDescription: room.description ?? "",
+          }));
+          setItems(eligibleItems);
+          setExpandedGroups(
+            Object.fromEntries(
+              eligibleItems.map((item) => [item.description, true]),
+            ),
+          );
+        })
+        .catch((reason: unknown) => {
+          if (version !== roomVersion.current) return;
+          setSourceRoomError(
+            reason instanceof ApiError && reason.status === 404
+              ? "החדר לא קיים"
+              : "לא ניתן לטעון כרגע את נתוני החדר",
+          );
+        })
+        .finally(() => {
+          if (version === roomVersion.current) {
+            setRoomLoading(false);
+            setItemsLoading(false);
+          }
+        });
+    }, 250);
+    return () => window.clearTimeout(timeout);
+  }, [source.orgScopeId, source.roomId]);
 
-  const handleExitPacking = () => {
-    setSummaryOpen(false)
-    onBack()
-  }
+  useEffect(() => {
+    const version = ++destinationVersion.current;
+    if (
+      destinationMode !== "existing" ||
+      !source.orgScopeId ||
+      !destinationSearch.trim()
+    ) {
+      setDestinationResults([]);
+      setDestinationLoading(false);
+      setDestinationError("");
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      setDestinationLoading(true);
+      setDestinationError("");
+      packingApi
+        .searchDestinations(
+          source.orgScopeId,
+          destinationSearch.trim(),
+          source.roomId.trim() || undefined,
+        )
+        .then((value) => {
+          if (version === destinationVersion.current)
+            setDestinationResults(value);
+        })
+        .catch(() => {
+          if (version === destinationVersion.current)
+            setDestinationError("לא ניתן לטעון יעדים כרגע");
+        })
+        .finally(() => {
+          if (version === destinationVersion.current)
+            setDestinationLoading(false);
+        });
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [destinationMode, destinationSearch, source.orgScopeId, source.roomId]);
 
-  const sectionCardSx = {
-    backgroundColor: 'rgba(240, 210, 155, 0.65)',
-    backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
-    borderRadius: '18px',
-    p: 2,
-    border: '1px solid rgba(255,255,255,0.25)',
-    boxShadow: '0 4px 18px rgba(0,0,0,0.1)',
-  }
+  const clearOperational = () => {
+    setSelected({});
+    setItems([]);
+    setSourceRoom(null);
+    setSourceRoomError("");
+    setError("");
+    setDescription("");
+    setDescriptionEdited(false);
+  };
+  const clearExistingDestinationForScopeChange = () => {
+    if (destinationMode !== "existing") return;
+    setSelectedDestination(null);
+    setDestinationSearch("");
+    setDestinationResults([]);
+    setDestinationError("");
+  };
+  const selectUnit = (unit: string) => {
+    clearOperational();
+    clearExistingDestinationForScopeChange();
+    setSource((current) => ({
+      ...current,
+      unit,
+      anaf: "",
+      mador: "",
+      team: "",
+      orgScopeId: "",
+      roomId: "",
+      sourceDescription: "",
+    }));
+  };
+  const selectAnaf = (anaf: string) => {
+    clearOperational();
+    clearExistingDestinationForScopeChange();
+    setSource((current) => ({
+      ...current,
+      anaf,
+      mador: "",
+      team: "",
+      orgScopeId: "",
+      roomId: "",
+      sourceDescription: "",
+    }));
+  };
+  const selectMador = (mador: string) => {
+    clearOperational();
+    clearExistingDestinationForScopeChange();
+    const matches = anafScopes.filter(
+      (scope) => scopeCode(scope, "mador") === mador,
+    );
+    const scope = matches.find((candidate) => !scopeCode(candidate, "team"));
+    setSource((current) => ({
+      ...current,
+      mador,
+      team: "",
+      orgScopeId: scope?.id ?? "",
+      roomId: "",
+      sourceDescription: "",
+    }));
+  };
+  const selectTeam = (team: string) => {
+    clearOperational();
+    clearExistingDestinationForScopeChange();
+    const scope = madorScopes.find(
+      (candidate) => scopeCode(candidate, "team") === team,
+    );
+    setSource((current) => ({
+      ...current,
+      team,
+      orgScopeId: scope?.id ?? "",
+      roomId: "",
+      sourceDescription: "",
+    }));
+  };
+  const selectRoom = (roomId: string) => {
+    clearOperational();
+    setSource((current) => ({ ...current, roomId, sourceDescription: "" }));
+  };
+  const toggleType = (value: PackingUnitType) => {
+    setPackingType(value);
+    setError("");
+    if (value === "personal_carton") {
+      setSelected({});
+      setDescription("");
+      setDescriptionEdited(false);
+    }
+  };
+  const toggleItem = (item: EligibleItem, checked: boolean) =>
+    setSelected((current) => {
+      const next = { ...current };
+      if (checked) next[item.id] = current[item.id] ?? item.quantity;
+      else delete next[item.id];
+      return next;
+    });
+  const toggleGroup = (group: EligibleItem[], checked: boolean) =>
+    setSelected((current) => {
+      const next = { ...current };
+      for (const item of group) {
+        if (checked) next[item.id] = current[item.id] ?? item.quantity;
+        else delete next[item.id];
+      }
+      return next;
+    });
+  const updateQuantity = (
+    item: EligibleItem,
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const raw = event.target.value;
+    setRawQuantities((current) => ({ ...current, [item.id]: raw }));
+    const quantity = Number(raw);
+    if (raw !== "" && Number.isFinite(quantity) && quantity >= 1) {
+      setSelected((current) => ({
+        ...current,
+        [item.id]: Math.min(item.quantity, Math.floor(quantity)),
+      }));
+    }
+  };
+  const commitQuantity = (item: EligibleItem) => {
+    setRawQuantities((current) => {
+      const next = { ...current };
+      delete next[item.id];
+      return next;
+    });
+    setSelected((current) => {
+      const val = current[item.id];
+      if (!val || val < 1) return { ...current, [item.id]: 1 };
+      return current;
+    });
+  };
+  const changeDestinationMode = (mode: "existing" | "new") => {
+    setDestinationMode(mode);
+    setDestinationError("");
+    setError("");
+    setSelectedDestination(null);
+    setDestinationResults([]);
+    if (mode === "existing") setDestinationSearch("");
+    else
+      setSource((current) => ({
+        ...current,
+        destinationId: "",
+        destinationDescription: "",
+        building: "",
+        floor: "",
+        destinationRoom: "",
+      }));
+  };
 
-  const inputSx = {
-    backgroundColor: 'rgba(246, 230, 195, 0.85)',
-    border: '1px solid rgba(200, 160, 100, 0.4)',
-    borderRadius: '12px',
-    padding: '10px 14px',
-    fontFamily: 'Heebo, sans-serif',
-    fontSize: '0.9rem',
-    color: '#3d2008',
-    outline: 'none',
-    width: '100%',
-    direction: 'rtl' as const,
-  }
+  const destinationIsValid =
+    destinationMode === "existing"
+      ? Boolean(selectedDestination)
+      : Boolean(
+          source.destinationId.trim() &&
+          source.destinationDescription.trim() &&
+          source.building.trim() &&
+          source.floor.trim() &&
+          source.destinationRoom.trim(),
+        );
+  const canSubmit = Boolean(
+    selectedScope &&
+    sourceRoom &&
+    packingType &&
+    description.trim() &&
+    destinationIsValid &&
+    (isPersonal ||
+      (sourceRoom.mappingStatus.completed && Object.keys(selected).length)),
+  );
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    if (!selectedScope || !sourceRoom || !packingType || !destinationIsValid) {
+      setError("יש להשלים את מקור האריזה, סוג האריזה והיעד.");
+      setToastOpen(true);
+      return;
+    }
+    if (!description.trim()) {
+      setError(
+        isPersonal
+          ? "יש להזין פירוט עבור קרטון אישי"
+          : "יש להזין פירוט יחידת אריזה",
+      );
+      setToastOpen(true);
+      return;
+    }
+    if (!isPersonal && !sourceRoom.mappingStatus.completed) {
+      setError("יש לסיים את המיפוי לפני אריזה שאינה אישית.");
+      setToastOpen(true);
+      return;
+    }
+    const selectedItems = Object.entries(selected).map(
+      ([itemId, quantity]) => ({ itemId, quantity }),
+    );
+    if (!isPersonal && !selectedItems.length) {
+      setError("יש לבחור לפחות פריט אחד לאריזה");
+      setToastOpen(true);
+      return;
+    }
+
+    const destination: CreatePackingUnitRequest["destination"] =
+      destinationMode === "existing"
+        ? { mode: "existing", destinationId: selectedDestination!.id }
+        : {
+            mode: "new",
+            destinationId: source.destinationId.trim(),
+            description: source.destinationDescription.trim(),
+            building: source.building.trim(),
+            floor: source.floor.trim(),
+            room: source.destinationRoom.trim(),
+          };
+    const draft: PackingDraft = {
+      ...source,
+      destinationMode,
+      destinationId:
+        destinationMode === "existing"
+          ? selectedDestination!.id
+          : source.destinationId.trim(),
+      destinationDescription:
+        destinationMode === "existing"
+          ? selectedDestination!.description
+          : source.destinationDescription.trim(),
+    };
+
+    setSubmitLoading(true);
+    try {
+      const response = await packingApi.createPackingUnit({
+        idempotencyKey: idempotencyKey.current,
+        orgScopeId: selectedScope.id,
+        description: description.trim(),
+        packingUnitType: packingType,
+        sourceRoomId: source.roomId.trim(),
+        destination,
+        items: isPersonal ? [] : selectedItems,
+      });
+      onComplete(response, draft);
+    } catch (reason: unknown) {
+      const message =
+        reason instanceof ApiError &&
+        reason.status === 409 &&
+        /יעד|destination/i.test(reason.message)
+          ? "יעד עם מזהה זה כבר קיים"
+          : errorMessage(reason);
+      setError(message);
+      setToastOpen(true);
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  if (!context)
+    return (
+      <BackgroundScreen>
+        <Box
+          sx={{
+            position: "relative",
+            zIndex: 1,
+            m: "auto",
+            px: 3,
+            textAlign: "center",
+            color: "white",
+          }}
+        >
+          <Typography role={contextError ? "alert" : "status"}>
+            {contextError || "טוען נתוני אריזה…"}
+          </Typography>
+          <Button onClick={onBack} sx={{ mt: 2, color: "white" }}>
+            חזרה
+          </Button>
+        </Box>
+      </BackgroundScreen>
+    );
 
   return (
     <ThemeProvider theme={theme}>
       <Box
         dir="rtl"
         sx={{
-          width: '100vw',
-          height: 'calc(100dvh - 62px)',
-          position: 'relative',
-          backgroundImage: 'url(/desert-bg.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center top',
-          backgroundRepeat: 'no-repeat',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
+          width: "100vw",
+          height: "100dvh",
+          position: "relative",
+          backgroundImage: "url(/desert-bg.jpg)",
+          backgroundSize: "cover",
+          backgroundPosition: "center top",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         }}
       >
-        {/* Overlay */}
         <Box
           sx={{
-            position: 'absolute',
+            position: "absolute",
             inset: 0,
             background:
-              'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 25%, transparent 50%)',
-            pointerEvents: 'none',
-            zIndex: 0,
+              "linear-gradient(to bottom, rgba(0,0,0,.25), transparent 50%)",
+            pointerEvents: "none",
           }}
         />
-
-        {/* Header */}
         <Box
           sx={{
-            position: 'relative',
+            position: "relative",
             zIndex: 2,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pt: '5vh',
-            pb: '1.5vh',
-            px: '5vw',
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            pt: "5vh",
+            pb: "1.5vh",
+            px: "5vw",
             flexShrink: 0,
           }}
         >
           <IconButton
             onClick={onBack}
-            sx={{ position: 'absolute', right: '4vw', color: 'white', p: 0.5 }}
+            aria-label="חזרה"
+            sx={{ position: "absolute", right: "4vw", color: "white" }}
           >
             <ChevronRight size={28} strokeWidth={2.5} />
           </IconButton>
           <Typography
             sx={{
-              fontFamily: 'Heebo, sans-serif',
               fontWeight: 800,
-              fontSize: '1.6rem',
-              color: 'white',
-              textShadow: '0 2px 8px rgba(0,0,0,0.45)',
-              letterSpacing: 0.5,
+              fontSize: "1.6rem",
+              color: "white",
+              textShadow: "0 2px 8px rgba(0,0,0,.45)",
             }}
           >
             יחידת אריזה
           </Typography>
         </Box>
-
-        {/* Scrollable form */}
         <Box
+          component="form"
+          onSubmit={handleSubmit}
           sx={{
-            position: 'relative',
+            position: "relative",
             zIndex: 1,
             flex: 1,
-            overflowY: 'auto',
-            px: '5vw',
-            pt: 1,
-            pb: 2,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 2,
-            '&::-webkit-scrollbar': { display: 'none' },
-            scrollbarWidth: 'none',
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          {/* מאיפה אורזים */}
-          <Box sx={sectionCardSx}>
-            <SectionLabel>מאיפה אורזים?</SectionLabel>
-            <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
-              <Box sx={{ flex: 1 }}>
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: "auto",
+              px: "5vw",
+              pt: 1,
+              pb: 2,
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              "&::-webkit-scrollbar": { display: "none" },
+              scrollbarWidth: "none",
+            }}
+          >
+            <Box sx={sectionCardSx}>
+              <SectionLabel>מאיפה אורזים?</SectionLabel>
+              <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
+                <Box sx={{ flex: 1 }}>
+                  <CustomSelect
+                    value={source.unit}
+                    placeholder="בחר יחידה"
+                    options={unitOptions}
+                    onChange={selectUnit}
+                  />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <CustomSelect
+                    value={source.anaf}
+                    placeholder="בחר ענף"
+                    options={anafOptions}
+                    disabled={!source.unit}
+                    onChange={selectAnaf}
+                  />
+                </Box>
+              </Box>
+              <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
+                <Box sx={{ flex: 1 }}>
+                  <CustomSelect
+                    value={source.mador}
+                    placeholder="בחר מדור"
+                    options={madorOptions}
+                    disabled={!source.anaf}
+                    onChange={selectMador}
+                  />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <CustomSelect
+                    value={source.team}
+                    placeholder="בחר צוות"
+                    options={teamOptions}
+                    disabled={!source.mador || !teamOptions.length}
+                    onChange={selectTeam}
+                  />
+                </Box>
+              </Box>
+              <Box
+                component="input"
+                list="source-rooms"
+                value={source.roomId}
+                disabled={!source.orgScopeId}
+                placeholder={roomsLoading ? "טוען חדרים…" : "בחר או הזן חדר מקור"}
+                onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                  selectRoom(event.target.value)
+                }
+                sx={{
+                  ...inputSx,
+                  opacity: source.orgScopeId ? 1 : 0.65,
+                  display: "block",
+                  width: "100%",
+                  boxSizing: "border-box",
+                }}
+              />
+              <datalist id="source-rooms">
+                {rooms.map((r) => (
+                  <option key={r.roomId} value={r.roomId}>
+                    {r.description ?? undefined}
+                  </option>
+                ))}
+              </datalist>
+              {roomLoading && (
+                <Typography
+                  sx={{ mt: 1, color: "#72583f", fontSize: ".85rem" }}
+                  role="status"
+                >
+                  טוען פרטי חדר…
+                </Typography>
+              )}
+              {sourceRoom && (
                 <Box
-                  component="input"
-                  value={sourceText}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setSourceText(e.target.value.replace(/\D/g, '').slice(0, 2))
-                  }
-                  placeholder="קוד יחידה"
-                  inputMode="numeric"
-                  maxLength={2}
-                  sx={inputSx}
-                />
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <Box
-                  component="input"
-                  value={branch}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setBranch(e.target.value.replace(/\D/g, '').slice(0, 2))
-                  }
-                  placeholder="קוד ענף"
-                  inputMode="numeric"
-                  maxLength={2}
-                  sx={inputSx}
-                />
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Box sx={{ flex: 1 }}>
-                <CustomSelect
-                  value={warehouse}
-                  placeholder="בחר מחסן"
-                  options={WAREHOUSES}
-                  onChange={setWarehouse}
-                />
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <CustomSelect
-                  value={room}
-                  placeholder="בחר מחדר"
-                  options={ROOMS}
-                  onChange={setRoom}
-                />
-              </Box>
-            </Box>
-          </Box>
-
-          {/* בחר סוג אריזה */}
-          <Box sx={sectionCardSx}>
-            <SectionLabel>בחר סוג אריזה</SectionLabel>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {PACKAGING_TYPES.map((type) => {
-                const selected = packagingType === type
-                return (
-                  <Box
-                    key={type}
-                    onClick={() => setPackagingType(type)}
+                  sx={{
+                    mt: 1,
+                    color: "#72583f",
+                    fontSize: ".84rem",
+                    display: "grid",
+                  }}
+                >
+                  <strong>{sourceRoom.id}</strong>
+                  <span>{sourceRoom.description || "לא הוגדר"}</span>
+                </Box>
+              )}
+              {sourceRoomError && (
+                <Typography
+                  sx={{
+                    mt: 1,
+                    color: "#9e1e22",
+                    fontSize: ".88rem",
+                    fontWeight: 700,
+                  }}
+                  role="alert"
+                >
+                  {sourceRoomError}
+                </Typography>
+              )}
+              {!roomLoading &&
+                sourceRoom &&
+                !sourceRoom.mappingStatus.completed && (
+                  <Typography
                     sx={{
-                      px: 2,
-                      py: '6px',
-                      borderRadius: '999px',
-                      backgroundColor: selected ? '#8B5E3C' : 'rgba(246, 230, 195, 0.85)',
-                      color: selected ? 'white' : '#6e4e37',
-                      fontFamily: 'Heebo, sans-serif',
-                      fontWeight: selected ? 700 : 500,
-                      fontSize: '0.85rem',
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                      border: selected
-                        ? '1px solid rgba(255,255,255,0.2)'
-                        : '1px solid rgba(200, 160, 100, 0.4)',
-                      boxShadow: selected ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
-                      transition: 'all 0.15s ease',
-                      WebkitTapHighlightColor: 'transparent',
+                      mt: 1,
+                      color: "#9e1e22",
+                      fontSize: ".9rem",
+                      fontWeight: 700,
                     }}
+                    role="alert"
                   >
-                    {type}
-                  </Box>
-                )
-              })}
+                    *יש לסיים את המיפוי
+                    {isPersonal && (
+                      <span> · קרטון אישי ניתן ליצור ללא מיפוי</span>
+                    )}
+                  </Typography>
+                )}
             </Box>
-          </Box>
 
-          {/* בחר פריטים לארוז */}
-          <Box sx={sectionCardSx}>
-            <SectionLabel>בחר פריטים לארוז</SectionLabel>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {items.map((item) => (
-                <Box key={item.id}>
-                  <Box
-                    onClick={() => toggleItem(item.id)}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      backgroundColor: 'rgba(246, 230, 195, 0.85)',
-                      borderRadius: item.expanded ? '12px 12px 0 0' : '12px',
-                      px: 1.5,
-                      py: 1,
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                      WebkitTapHighlightColor: 'transparent',
-                      border: '1px solid rgba(200, 160, 100, 0.3)',
-                      borderBottom: item.expanded
-                        ? '1px solid rgba(200, 160, 100, 0.15)'
-                        : '1px solid rgba(200, 160, 100, 0.3)',
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      {item.expanded ? (
-                        <ChevronUp size={18} color="#8B5E3C" />
-                      ) : (
-                        <ChevronDown size={18} color="#8B5E3C" />
-                      )}
-                      <Typography
-                        sx={{
-                          fontFamily: 'Heebo, sans-serif',
-                          fontSize: '0.85rem',
-                          color: '#6e4e37',
-                          fontWeight: 500,
-                        }}
-                      >
-                        כמות: {item.count}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography
-                        sx={{
-                          fontFamily: 'Heebo, sans-serif',
-                          fontSize: '0.9rem',
-                          fontWeight: 700,
-                          color: '#3d2008',
-                        }}
-                      >
-                        {item.name}
-                      </Typography>
-                      <Checkbox
-                        size="small"
-                        checked={item.subItems.every((s) => s.checked)}
-                        indeterminate={
-                          item.subItems.some((s) => s.checked) &&
-                          !item.subItems.every((s) => s.checked)
-                        }
-                        onChange={(e) => {
-                          e.stopPropagation()
-                          toggleAllSubItems(item.id, e.target.checked)
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        sx={{
-                          p: 0,
-                          color: '#8B5E3C',
-                          '&.Mui-checked': { color: '#8B5E3C' },
-                          '&.MuiCheckbox-indeterminate': { color: '#8B5E3C' },
-                        }}
-                      />
-                    </Box>
-                  </Box>
-
-                  {item.expanded && (
+            <Box sx={sectionCardSx}>
+              <SectionLabel>בחר סוג אריזה</SectionLabel>
+              <Box
+                sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}
+                role="radiogroup"
+                aria-label="סוג אריזה"
+              >
+                {TYPE_OPTIONS.map((option) => {
+                  const active = packingType === option.value;
+                  return (
                     <Box
+                      key={option.value}
+                      role="radio"
+                      aria-checked={active}
+                      tabIndex={0}
+                      onClick={() => toggleType(option.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ")
+                          toggleType(option.value);
+                      }}
                       sx={{
-                        backgroundColor: 'rgba(250, 238, 210, 0.75)',
-                        borderRadius: '0 0 12px 12px',
-                        border: '1px solid rgba(200, 160, 100, 0.3)',
-                        borderTop: 'none',
-                        overflow: 'hidden',
+                        px: 2,
+                        py: "6px",
+                        borderRadius: "999px",
+                        backgroundColor: active
+                          ? "#8B5E3C"
+                          : "rgba(246,230,195,.85)",
+                        color: active ? "white" : "#6e4e37",
+                        fontWeight: active ? 700 : 500,
+                        fontSize: ".85rem",
+                        cursor: "pointer",
+                        border: "1px solid rgba(200,160,100,.4)",
+                        "&:focus-visible": {
+                          outline: "3px solid #1f5e78",
+                          outlineOffset: 2,
+                        },
                       }}
                     >
-                      {item.subItems.map((sub, sIdx) => (
+                      {option.label}
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Box>
+
+            {isPersonal ? (
+              <Box sx={{ ...sectionCardSx, py: 1.5 }}>
+                <Typography
+                  sx={{
+                    color: "#6e4e37",
+                    fontSize: ".88rem",
+                    textAlign: "center",
+                  }}
+                >
+                  קרטון אישי אינו כולל פריטים. יש להזין פירוט ולשמור את היחידה.
+                </Typography>
+              </Box>
+            ) : (
+              <Box sx={sectionCardSx}>
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <SectionLabel>בחר פריטים לארוז</SectionLabel>
+                  <Typography sx={{ color: "#80644b", fontSize: ".78rem" }}>
+                    {itemsLoading
+                      ? "טוען…"
+                      : `${Object.keys(selected).length} נבחרו`}
+                  </Typography>
+                </Box>
+                {!source.roomId && (
+                  <Typography sx={{ color: "#72583f", fontSize: ".85rem" }}>
+                    בחר חדר מקור כדי לטעון פריטים זמינים.
+                  </Typography>
+                )}
+                {!itemsLoading && sourceRoom && !items.length && (
+                  <Typography sx={{ color: "#72583f", fontSize: ".85rem" }}>
+                    אין פריטים זמינים בחדר שנבחר.
+                  </Typography>
+                )}
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  {groupedItems.map(([groupName, group]) => {
+                    const selectedCount = group.filter(
+                      (item) => item.id in selected,
+                    ).length;
+                    const expanded = expandedGroups[groupName] ?? true;
+                    return (
+                      <Box key={groupName}>
                         <Box
-                          key={sub.id}
+                          onClick={() =>
+                            setExpandedGroups((current) => ({
+                              ...current,
+                              [groupName]: !expanded,
+                            }))
+                          }
                           sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            backgroundColor: "rgba(246,230,195,.85)",
+                            borderRadius: expanded ? "12px 12px 0 0" : "12px",
                             px: 1.5,
-                            py: '8px',
-                            borderBottom:
-                              sIdx < item.subItems.length - 1
-                                ? '1px solid rgba(200, 160, 100, 0.2)'
-                                : 'none',
+                            py: 1,
+                            cursor: "pointer",
+                            border: "1px solid rgba(200,160,100,.3)",
                           }}
                         >
-                          <Checkbox
-                            size="small"
-                            checked={sub.checked}
-                            onChange={() => toggleSubItem(item.id, sub.id)}
-                            sx={{ p: 0, color: '#8B5E3C', '&.Mui-checked': { color: '#8B5E3C' } }}
-                          />
-                          <Typography
+                          <Box sx={{ display: "flex", gap: 0.5 }}>
+                            {expanded ? (
+                              <ChevronUp size={18} />
+                            ) : (
+                              <ChevronDown size={18} />
+                            )}
+                            <Typography
+                              sx={{ fontSize: ".85rem", color: "#6e4e37" }}
+                            >
+                              כמות:{" "}
+                              {group.reduce(
+                                (sum, item) => sum + item.quantity,
+                                0,
+                              )}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: "flex", gap: 0.5 }}>
+                            <strong>{groupName}</strong>
+                            <Checkbox
+                              size="small"
+                              checked={selectedCount === group.length}
+                              indeterminate={
+                                selectedCount > 0 &&
+                                selectedCount < group.length
+                              }
+                              onChange={(event) =>
+                                toggleGroup(group, event.target.checked)
+                              }
+                              onClick={(event) => event.stopPropagation()}
+                              sx={{ p: 0, color: "#8B5E3C" }}
+                            />
+                          </Box>
+                        </Box>
+                        {expanded && (
+                          <Box
                             sx={{
-                              fontFamily: 'Heebo, sans-serif',
-                              fontSize: '0.85rem',
-                              color: '#6e4e37',
+                              backgroundColor: "rgba(250,238,210,.75)",
+                              borderRadius: "0 0 12px 12px",
+                              border: "1px solid rgba(200,160,100,.3)",
+                              borderTop: 0,
                             }}
                           >
-                            {item.name} ={sub.id}
-                          </Typography>
+                            {group.map((item, index) => (
+                              <Box
+                                key={item.id}
+                                sx={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  gap: 1,
+                                  px: 1.5,
+                                  py: 1,
+                                  borderBottom:
+                                    index < group.length - 1
+                                      ? "1px solid rgba(200,160,100,.2)"
+                                      : 0,
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    minWidth: 0,
+                                  }}
+                                >
+                                  <Checkbox
+                                    size="small"
+                                    checked={item.id in selected}
+                                    onChange={(event) =>
+                                      toggleItem(item, event.target.checked)
+                                    }
+                                    sx={{ p: 0, mr: 0.5, color: "#8B5E3C" }}
+                                  />
+                                  <Typography
+                                    sx={{
+                                      fontSize: ".8rem",
+                                      color: "#6e4e37",
+                                      overflowWrap: "anywhere",
+                                    }}
+                                  >
+                                    {item.description}{" "}
+                                    <small>({item.id})</small>
+                                  </Typography>
+                                </Box>
+                                {item.id in selected && (
+                                  <Box
+                                    component="input"
+                                    type="number"
+                                    min={1}
+                                    max={item.quantity}
+                                    value={rawQuantities[item.id] ?? String(selected[item.id])}
+                                    aria-label={`כמות ${item.description}`}
+                                    onChange={(
+                                      event: ChangeEvent<HTMLInputElement>,
+                                    ) => updateQuantity(item, event)}
+                                    onBlur={() => commitQuantity(item)}
+                                    sx={{
+                                      ...inputSx,
+                                      width: 70,
+                                      minHeight: 34,
+                                      p: "5px 7px",
+                                    }}
+                                  />
+                                )}
+                              </Box>
+                            ))}
+                          </Box>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
+            )}
+
+            <Box sx={sectionCardSx}>
+              <SectionLabel>פירוט יחידת אריזה</SectionLabel>
+              <Box
+                component="textarea"
+                value={description}
+                onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
+                  setDescription(event.target.value);
+                  setDescriptionEdited(true);
+                }}
+                placeholder={
+                  isPersonal
+                    ? "פירוט עבור קרטון אישי"
+                    : "הפירוט מתעדכן לפי הפריטים שנבחרו"
+                }
+                rows={4}
+                sx={{
+                  ...inputSx,
+                  minHeight: 106,
+                  resize: "vertical",
+                  display: "block",
+                }}
+              />
+              {!isPersonal && !descriptionEdited && generatedDescription && (
+                <Typography
+                  sx={{ mt: 0.75, color: "#80644b", fontSize: ".76rem" }}
+                >
+                  הפירוט נוצר אוטומטית מהפריטים שנבחרו; אפשר לערוך אותו.
+                </Typography>
+              )}
+            </Box>
+
+            <Box sx={sectionCardSx}>
+              <SectionLabel>לאן שולחים?</SectionLabel>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 0.75,
+                  mb: 1.5,
+                  p: 0.4,
+                  borderRadius: "999px",
+                  backgroundColor: "rgba(246,230,195,.7)",
+                }}
+                role="radiogroup"
+              >
+                {(["existing", "new"] as const).map((mode) => (
+                  <Box
+                    key={mode}
+                    component="button"
+                    type="button"
+                    role="radio"
+                    aria-checked={destinationMode === mode}
+                    onClick={() => changeDestinationMode(mode)}
+                    sx={{
+                      minHeight: 40,
+                      border: 0,
+                      borderRadius: "999px",
+                      color: destinationMode === mode ? "white" : "#6e4e37",
+                      backgroundColor:
+                        destinationMode === mode ? "#8B5E3C" : "transparent",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {mode === "existing" ? "יעד קיים" : "יעד חדש"}
+                  </Box>
+                ))}
+              </Box>
+              {destinationMode === "existing" ? (
+                <Box sx={{ display: "grid", gap: 1 }}>
+                  <Box
+                    component="input"
+                    value={destinationSearch}
+                    disabled={!source.orgScopeId}
+                    placeholder="חיפוש לפי מזהה או תיאור יעד"
+                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                      setDestinationSearch(event.target.value);
+                      setSelectedDestination(null);
+                    }}
+                    sx={{ ...inputSx, opacity: source.orgScopeId ? 1 : 0.65 }}
+                  />
+                  {destinationLoading && (
+                    <Typography role="status">טוען יעדים…</Typography>
+                  )}
+                  {destinationError && (
+                    <Typography color="error" role="alert">
+                      {destinationError}
+                    </Typography>
+                  )}
+                  {!destinationLoading &&
+                    !destinationError &&
+                    destinationSearch.trim() &&
+                    !destinationResults.length && (
+                      <Typography sx={{ color: "#72583f", fontSize: ".85rem" }}>
+                        לא נמצאו יעדים
+                      </Typography>
+                    )}
+                  {!!destinationResults.length && (
+                    <Box
+                      role="listbox"
+                      sx={{
+                        maxHeight: 230,
+                        overflowY: "auto",
+                        border: "1px solid rgba(200,160,100,.35)",
+                        borderRadius: "12px",
+                      }}
+                    >
+                      {destinationResults.map((destination) => (
+                        <Box
+                          key={destination.id}
+                          component="button"
+                          type="button"
+                          role="option"
+                          aria-selected={
+                            selectedDestination?.id === destination.id
+                          }
+                          onClick={() => {
+                            setSelectedDestination(destination);
+                            setDestinationSearch(destination.id);
+                            setSource((current) => ({
+                              ...current,
+                              destinationId: destination.id,
+                              destinationDescription: destination.description,
+                            }));
+                          }}
+                          sx={{
+                            display: "block",
+                            width: "100%",
+                            border: 0,
+                            borderBottom: "1px solid rgba(200,160,100,.22)",
+                            px: 1.5,
+                            py: 1.25,
+                            textAlign: "right",
+                            color: "#3d2008",
+                            backgroundColor:
+                              selectedDestination?.id === destination.id
+                                ? "rgba(139,94,60,.16)"
+                                : "rgba(250,238,210,.72)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <strong>
+                            {destination.id} — {destination.description}
+                          </strong>
                         </Box>
                       ))}
                     </Box>
                   )}
+                  {selectedDestination && (
+                    <Typography sx={{ color: "#72583f", fontSize: ".84rem" }}>
+                      <strong>{selectedDestination.id}</strong> —{" "}
+                      {selectedDestination.description}
+                    </Typography>
+                  )}
                 </Box>
-              ))}
+              ) : (
+                <Box sx={{ display: "grid", gap: 1 }}>
+                  <Box
+                    component="input"
+                    value={source.destinationId}
+                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                      setSource((current) => ({
+                        ...current,
+                        destinationId: event.target.value,
+                      }))
+                    }
+                    placeholder="מזהה יעד"
+                    aria-label="מזהה יעד"
+                    sx={inputSx}
+                  />
+                  <Box
+                    component="textarea"
+                    value={source.destinationDescription}
+                    onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
+                      setSource((current) => ({
+                        ...current,
+                        destinationDescription: event.target.value,
+                      }))
+                    }
+                    placeholder="תיאור היעד"
+                    aria-label="תיאור היעד"
+                    rows={3}
+                    sx={{ ...inputSx, resize: "vertical" }}
+                  />
+                  <Box sx={{ display: "flex", gap: 1 }}>
+                    <Box
+                      component="input"
+                      value={source.building}
+                      onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                        setSource((current) => ({
+                          ...current,
+                          building: event.target.value,
+                        }))
+                      }
+                      placeholder="בניין"
+                      aria-label="בניין יעד"
+                      sx={inputSx}
+                    />
+                    <Box
+                      component="input"
+                      value={source.floor}
+                      onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                        setSource((current) => ({
+                          ...current,
+                          floor: event.target.value,
+                        }))
+                      }
+                      placeholder="קומה"
+                      aria-label="קומת יעד"
+                      sx={inputSx}
+                    />
+                  </Box>
+                  <Box
+                    component="input"
+                    value={source.destinationRoom}
+                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                      setSource((current) => ({
+                        ...current,
+                        destinationRoom: event.target.value,
+                      }))
+                    }
+                    placeholder="חדר יעד"
+                    aria-label="חדר יעד"
+                    sx={inputSx}
+                  />
+                </Box>
+              )}
             </Box>
+            {error && (
+              <Typography
+                sx={{
+                  color: "#9e1e22",
+                  fontSize: ".9rem",
+                  fontWeight: 700,
+                  px: 1,
+                }}
+                role="alert"
+              >
+                {error}
+              </Typography>
+            )}
           </Box>
-
-          {/* לאן שולחים */}
-          <Box sx={sectionCardSx}>
-            <SectionLabel>לאן שולחים?</SectionLabel>
-            <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
-              <Box sx={{ flex: 1 }}>
-                <Box
-                  component="input"
-                  value={destText}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setDestText(e.target.value)
-                  }
-                  placeholder="ו"
-                  sx={inputSx}
-                />
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <CustomSelect
-                  value={floor}
-                  placeholder="בחר קומה"
-                  options={FLOORS}
-                  onChange={setFloor}
-                />
-              </Box>
-            </Box>
-            <CustomSelect
-              value={building}
-              placeholder="בחר בניין"
-              options={BUILDINGS}
-              onChange={setBuilding}
-            />
-          </Box>
-        </Box>
-
-        {/* Fixed bottom button */}
-        <Box
-          sx={{
-            position: 'relative',
-            zIndex: 2,
-            flexShrink: 0,
-            px: '5vw',
-            pt: 1.5,
-            pb: 'max(env(safe-area-inset-bottom), 20px)',
-            backgroundColor: 'transparent',
-          }}
-        >
           <Box
-            onClick={handleFinish}
             sx={{
-              width: '100%',
-              py: '14px',
-              borderRadius: '999px',
-              backgroundColor: allFilled ? '#8B5E3C' : 'rgba(139, 94, 60, 0.4)',
-              color: allFilled ? 'white' : 'rgba(255,255,255,0.6)',
-              fontFamily: 'Heebo, sans-serif',
-              fontWeight: 700,
-              fontSize: '1.05rem',
-              textAlign: 'center',
-              cursor: allFilled ? 'pointer' : 'default',
-              boxShadow: allFilled ? '0 4px 16px rgba(0,0,0,0.25)' : 'none',
-              letterSpacing: 0.5,
-              WebkitTapHighlightColor: 'transparent',
-              userSelect: 'none',
-              transition: 'all 0.2s ease',
-              ...(allFilled && {
-                '&:active': {
-                  transform: 'scale(0.97)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                },
-              }),
+              flexShrink: 0,
+              px: "5vw",
+              pt: 1.5,
+              pb: "max(env(safe-area-inset-bottom), 20px)",
             }}
           >
-            סיום אריזה
+            <Box
+              component="button"
+              type="submit"
+              disabled={submitLoading || roomLoading}
+              sx={{
+                width: "100%",
+                py: "14px",
+                border: 0,
+                borderRadius: "999px",
+                backgroundColor: canSubmit ? "#8B5E3C" : "rgba(139,94,60,.4)",
+                color: canSubmit ? "white" : "rgba(255,255,255,.6)",
+                fontWeight: 700,
+                fontSize: "1.05rem",
+                cursor: submitLoading || roomLoading ? "wait" : "pointer",
+              }}
+            >
+              {submitLoading ? "שומר יחידת אריזה…" : "סיום אריזה"}
+            </Box>
           </Box>
         </Box>
-
-        {/* Packing Unit Summary Modal */}
-        <PackingUnitSummaryModal
-          open={summaryOpen}
-          serialNumber={serialNumber}
-          source={{
-            unit: sourceText || '',
-            anaf: branch || '',
-            mador: orgScope?.mador || '',
-            room: room || warehouse || 'חדר 208',
-          }}
-          destination={{
-            building: building || 'בניין A',
-            floor: floor || 'קומה 3',
-            room: destText || 'חדר 309',
-          }}
-          madorSupervisor="שם אחראי"
-          roomSupervisor="שם אחראי"
-          packerName={
-            user?.name
-              ? `${user.name} ${user.personalNumber || '9223345'}`
-              : 'שימי שמעוני 9223345'
-          }
-          onContinue={handleContinuePacking}
-          onExit={handleExitPacking}
-        />
-
-        {/* Toast */}
         <Snackbar
           open={toastOpen}
           autoHideDuration={2500}
           onClose={() => setToastOpen(false)}
-          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-          message="לא כל השדות הנדרשים מולאו"
-          slotProps={{
-            content: {
-              sx: {
-                backgroundColor: '#5a3010',
-                fontFamily: 'Heebo, sans-serif',
-                fontSize: '0.9rem',
-                borderRadius: '12px',
-                direction: 'rtl',
-              },
-            },
-          }}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+          message={error}
         />
       </Box>
     </ThemeProvider>
-  )
+  );
+}
+
+export function PackingSuccessScreen({
+  response,
+  onContinue,
+  onHome,
+}: {
+  response: PackingSuccessResponse;
+  onContinue: () => void;
+  onHome: () => void;
+}) {
+  const typeLabel =
+    TYPE_OPTIONS.find((option) => option.value === response.packingUnit.type)
+      ?.label ?? "יחידת אריזה";
+  const sourceLabel =
+    [
+      response.source.unit,
+      response.source.anaf,
+      response.source.mador,
+      response.source.team,
+      response.source.roomDisplayName ?? response.source.roomId,
+    ]
+      .filter(Boolean)
+      .join(" · ") || "לא הוגדר";
+  const destinationLocation = [
+    response.destination.building,
+    response.destination.floor,
+    response.destination.room,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const destinationLabel =
+    [response.destination.id, destinationLocation]
+      .filter(Boolean)
+      .join(" — ") || "לא הוגדר";
+  const statusLabel =
+    packingUnitStatusLabels[response.packingUnit.status] ??
+    response.packingUnit.status;
+  const personLabel = (
+    person: { name: string; phone: string | null } | null,
+  ) =>
+    person
+      ? `${person.name}${person.phone ? ` · ${person.phone}` : ""}`
+      : "לא הוגדר";
+  const details = [
+    ["נשלח מ:", sourceLabel],
+    ["תיאור מקור:", response.source.description || "לא הוגדר"],
+    ["נשלח אל:", destinationLabel],
+    ["תיאור יעד:", response.destination.description || "לא הוגדר"],
+    ["אחראי מדור:", personLabel(response.responsiblePeople.mador)],
+    ["אחראי חדר:", personLabel(response.responsiblePeople.room)],
+    ["אורז:", response.responsiblePeople.packer.displayName],
+    ["פריטים:", String(response.packingUnit.itemCount)],
+  ];
+  return (
+    <BackgroundScreen>
+      <Box
+        sx={{
+          position: "relative",
+          zIndex: 1,
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          display: "grid",
+          placeItems: "center",
+          px: "5vw",
+          py: 3,
+        }}
+      >
+        <Box
+          sx={{
+            ...sectionCardSx,
+            width: "min(700px, 100%)",
+            p: { xs: 2.5, sm: 4 },
+            color: "#3d2008",
+          }}
+        >
+          <Typography
+            sx={{ color: "#8b5e3c", textAlign: "center", fontWeight: 800 }}
+          >
+            {typeLabel}
+          </Typography>
+          <Typography
+            component="h1"
+            sx={{
+              mb: 2.5,
+              textAlign: "center",
+              fontSize: "clamp(1.55rem, 5vw, 2.2rem)",
+              fontWeight: 800,
+            }}
+          >
+            יחידת אריזה הושלמה!
+          </Typography>
+          <Box
+            sx={{
+              display: "grid",
+              gap: 0.5,
+              mb: 2,
+              p: 2,
+              borderRadius: "16px",
+              color: "white",
+              textAlign: "center",
+              backgroundColor: "#8b5e3c",
+            }}
+          >
+            <small>מס׳ אריזה</small>
+            <Typography
+              sx={{ fontSize: "2rem", letterSpacing: ".14em", fontWeight: 800 }}
+            >
+              {response.packingUnit.displaySerial ?? "לא הוגדר"}
+            </Typography>
+            <small>{statusLabel}</small>
+          </Box>
+          <Box
+            sx={{
+              mb: 2,
+              p: 1.5,
+              borderRadius: "14px",
+              backgroundColor: "rgba(255,247,228,.65)",
+            }}
+          >
+            {response.packingUnit.description}
+          </Box>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+              gap: 1.5,
+            }}
+          >
+            {details.map(([label, value]) => (
+              <Box
+                key={label}
+                sx={{
+                  display: "grid",
+                  gap: 0.3,
+                  pb: 1,
+                  borderBottom: "1px solid rgba(141,95,52,.22)",
+                }}
+              >
+                <Typography sx={{ color: "#80644b", fontSize: ".82rem" }}>
+                  {label}
+                </Typography>
+                <Typography
+                  sx={{ overflowWrap: "anywhere", fontSize: ".92rem" }}
+                >
+                  {value}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+          <Box
+            sx={{
+              display: "grid",
+              gap: 1.5,
+              mt: 2.5,
+              pt: 2,
+              borderTop: "1px solid rgba(141,95,52,.25)",
+              textAlign: "center",
+            }}
+          >
+            <strong>האם להמשיך באריזה?</strong>
+            <Box
+              sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}
+            >
+              <Box
+                component="button"
+                type="button"
+                onClick={onContinue}
+                sx={{
+                  minHeight: 48,
+                  border: 0,
+                  borderRadius: "999px",
+                  color: "white",
+                  backgroundColor: "#8b5e3c",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                כן
+              </Box>
+              <Box
+                component="button"
+                type="button"
+                onClick={onHome}
+                sx={{
+                  minHeight: 48,
+                  border: 0,
+                  borderRadius: "999px",
+                  color: "#5b3519",
+                  backgroundColor: "rgba(255,247,228,.86)",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                לא
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    </BackgroundScreen>
+  );
 }

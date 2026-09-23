@@ -1,5 +1,10 @@
 import { UserRole } from '@prisma/client';
-import { ItemStatus, PackingUnitStatus, ShipmentStatus } from '@prisma/client';
+import {
+  ItemStatus,
+  PackingUnitStatus,
+  PackingUnitType,
+  ShipmentStatus,
+} from '@prisma/client';
 import { canAccessMador } from './permissions.js';
 import {
   formatSerial,
@@ -7,6 +12,8 @@ import {
   summarizeQuantities,
 } from './quantities.js';
 import { summarizeReceiving } from './receiving.js';
+import { mappingStatusFromProvenance } from './mapping.js';
+import { createPackingUnitSchema } from './operations.schemas.js';
 import {
   assertClaimSucceeded,
   assertPackingUnitCanVerify,
@@ -66,6 +73,17 @@ describe('operational domain rules', () => {
       assertPackingUnitCanVerify([ItemStatus.verified]),
     ).not.toThrow();
     expect(() =>
+      assertPackingUnitCanVerify([], {
+        packingUnitType: PackingUnitType.personal_carton,
+      }),
+    ).toThrow('קרטון אישי דורש אימות קבלה מפורש');
+    expect(() =>
+      assertPackingUnitCanVerify([], {
+        packingUnitType: PackingUnitType.personal_carton,
+        explicitEmptyUnitVerification: true,
+      }),
+    ).not.toThrow();
+    expect(() =>
       assertShipmentCanVerify([
         PackingUnitStatus.verified,
         PackingUnitStatus.in_transit,
@@ -90,6 +108,80 @@ describe('operational domain rules', () => {
   it('formats the DB-backed serial for physical labels', () => {
     expect(formatSerial(1)).toBe('00001');
     expect(formatSerial(532)).toBe('00532');
+  });
+
+  it('marks mapping from provenance, independently of eligible item count', () => {
+    expect(mappingStatusFromProvenance('room-1', 2)).toEqual({
+      roomId: 'room-1',
+      exists: true,
+      completed: true,
+      source: 'mapping_report_provenance',
+    });
+    expect(mappingStatusFromProvenance('room-2', 0)).toMatchObject({
+      exists: true,
+      completed: false,
+    });
+    expect(mappingStatusFromProvenance(undefined, 0).source).toBe('not_selected');
+  });
+
+  it('allows a personal carton without Items and requires Items otherwise', () => {
+    const base = {
+      idempotencyKey: '123e4567-e89b-12d3-a456-426614174000',
+      orgScopeId: '123e4567-e89b-12d3-a456-426614174001',
+      description: 'קרטון אישי - חדר 1',
+      sourceRoomId: 'חדר 1',
+      destination: {
+        mode: 'new' as const,
+        destinationId: 'DEST-200',
+        description: 'יעד בדיקה',
+        building: 'א',
+        floor: '1',
+        room: '2',
+      },
+    };
+
+    expect(
+      createPackingUnitSchema.safeParse({
+        ...base,
+        packingUnitType: PackingUnitType.personal_carton,
+        items: [],
+      }).success,
+    ).toBe(true);
+    expect(
+      createPackingUnitSchema.safeParse({
+        ...base,
+        packingUnitType: PackingUnitType.personal_carton,
+        items: [{ itemId: '123e4567-e89b-12d3-a456-426614174002', quantity: 1 }],
+      }).success,
+    ).toBe(false);
+    const withOptionalDescriptions = createPackingUnitSchema.safeParse({
+      ...base,
+      description: 'קרטון אישי עם ציוד אישי',
+      destination: {
+        ...base.destination,
+        description: 'להניח בחדר הקליטה',
+      },
+      packingUnitType: PackingUnitType.personal_carton,
+      items: [],
+    });
+    expect(withOptionalDescriptions.success).toBe(true);
+    expect(
+      createPackingUnitSchema.safeParse({
+        ...base,
+        description: '',
+        packingUnitType: PackingUnitType.personal_carton,
+        items: [],
+      }).error?.issues.some(
+        ({ message }) => message === 'יש להזין פירוט עבור קרטון אישי',
+      ),
+    ).toBe(true);
+    expect(
+      createPackingUnitSchema.safeParse({
+        ...base,
+        packingUnitType: PackingUnitType.professional_carton,
+        items: [],
+      }).success,
+    ).toBe(false);
   });
 
   it('computes receiving discrepancies from explicit confirmations', () => {

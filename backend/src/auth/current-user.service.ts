@@ -8,6 +8,9 @@ export interface CurrentUser {
   id: string;
   email: string;
   role: UserRole;
+  firstName: string | null;
+  lastName: string | null;
+  personalNumber: string | null;
   orgScopeId: string | null;
   orgCode: string | null;
   access: AccessProfile;
@@ -15,19 +18,6 @@ export interface CurrentUser {
 
 @Injectable()
 export class CurrentUserService {
-  listDemoUsers() {
-    return db.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        orgScopeId: true,
-        orgCode: true,
-      },
-      orderBy: { email: 'asc' },
-    });
-  }
-
   async require(headerValue: string | undefined): Promise<CurrentUser> {
     const parsedId = uuidSchema.safeParse(headerValue);
     if (!parsedId.success) {
@@ -47,6 +37,9 @@ export class CurrentUserService {
       id: user.id,
       email: user.email,
       role: user.role,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      personalNumber: user.personalNumber,
       orgScopeId: user.orgScopeId,
       orgCode: user.orgCode,
       access: {

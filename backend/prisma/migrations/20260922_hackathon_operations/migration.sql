@@ -50,6 +50,11 @@ ALTER TABLE shipments
 CREATE UNIQUE INDEX IF NOT EXISTS shipments_idempotency_key_key
   ON shipments(idempotency_key) WHERE idempotency_key IS NOT NULL;
 
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS first_name text,
+  ADD COLUMN IF NOT EXISTS last_name text,
+  ADD COLUMN IF NOT EXISTS personal_number text;
+
 ALTER TABLE items
   ADD COLUMN IF NOT EXISTS quantity integer NOT NULL DEFAULT 1,
   ADD COLUMN IF NOT EXISTS distributed_quantity integer NOT NULL DEFAULT 0;

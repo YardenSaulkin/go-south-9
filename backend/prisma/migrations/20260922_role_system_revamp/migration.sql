@@ -102,3 +102,59 @@ SELECT
   END                                                           AS data_visibility_scope
 FROM users u
 LEFT JOIN org_scopes s ON s.id = u.org_scope_id;
+
+-- 9. Keep resource-creation enforcement aligned with the renamed enum values.
+-- PostgreSQL does not rewrite enum literals embedded in existing function
+-- bodies when an enum value is renamed, so replace the trigger function after
+-- renaming super_user -> admin and regular_user -> normal.
+CREATE OR REPLACE FUNCTION public.enforce_resource_creation_permissions()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO ''
+AS $function$
+DECLARE
+  creator_role public.user_role;
+  creator_mador text;
+  resource_mador text;
+BEGIN
+  SELECT user_record.role, creator_scope.mador
+    INTO creator_role, creator_mador
+    FROM public.users AS user_record
+    LEFT JOIN public.org_scopes AS creator_scope
+      ON creator_scope.id = user_record.org_scope_id
+    WHERE user_record.id = NEW.created_by_user_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING
+      errcode = '23503',
+      message = 'The creator user does not exist.';
+  END IF;
+
+  SELECT scope.mador
+    INTO resource_mador
+    FROM public.org_scopes AS scope
+    WHERE scope.id = NEW.org_scope_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING
+      errcode = '23503',
+      message = 'The resource organization scope does not exist.';
+  END IF;
+
+  IF TG_TABLE_NAME = 'shipments'
+     AND creator_role = 'normal'::public.user_role THEN
+    RAISE EXCEPTION USING
+      errcode = '42501',
+      message = 'A normal user cannot create a shipment.';
+  END IF;
+
+  IF creator_role <> 'admin'::public.user_role
+     AND creator_mador IS DISTINCT FROM resource_mador THEN
+    RAISE EXCEPTION USING
+      errcode = '42501',
+      message = 'A non-admin user can create resources only in their own mador.';
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;

@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { parseOrgCode } from '../domain/org-code.js';
 import { db } from '../lib/db.js';
 
 export interface AdminUserView {
@@ -31,6 +32,17 @@ export class AdminService {
       personalNumber: u.personalNumber,
       role: u.role,
       orgCode: u.orgCode,
+      orgNames: u.orgCode
+        ? (() => {
+            const hierarchy = parseOrgCode(u.orgCode);
+            return {
+              unit: hierarchy.unitCode,
+              anaf: hierarchy.anafCode,
+              mador: hierarchy.madorCode,
+              team: hierarchy.teamCode,
+            };
+          })()
+        : null,
     }));
   }
 

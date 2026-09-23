@@ -18,6 +18,7 @@
     "start:debug": "node scripts/with-db-env.mjs nest start --debug --watch",
     "start:prod": "node scripts/with-db-env.mjs node dist/main",
     "lint": "oxlint --type-aware src/ test/",
+    "seed:hackathon": "node scripts/with-db-env.mjs node --experimental-strip-types scripts/seed-hackathon-data.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",

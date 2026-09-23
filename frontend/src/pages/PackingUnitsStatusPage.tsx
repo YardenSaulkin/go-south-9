@@ -119,9 +119,14 @@ export default function PackingUnitsStatusPage({ userId }: Props) {
       }
       return Array.from(grouped.entries()).map(([code, units]) => (
         <Box key={code} sx={{ mb: 3 }}>
-          <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontWeight: 700, color: '#2d1b0a', mb: 0.5 }}>
-            יחידה {code}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+            <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontWeight: 700, color: '#2d1b0a' }}>
+              יחידה {code}
+            </Typography>
+            <Typography sx={{ fontFamily: 'Heebo, sans-serif', fontSize: '0.85rem', color: '#8B5E3C' }}>
+              כמות: {units.length}
+            </Typography>
+          </Box>
           <Divider sx={{ mb: 1.5, borderColor: 'rgba(139,94,60,0.3)' }} />
           {units.map((pu) => <PackingUnitCard key={pu.id} pu={pu} />)}
         </Box>
@@ -135,7 +140,7 @@ export default function PackingUnitsStatusPage({ userId }: Props) {
     <ThemeProvider theme={theme}>
       <Box
         dir="rtl"
-        sx={{ minHeight: 'calc(100dvh - 62px)', bgcolor: '#f5f0eb', display: 'flex', flexDirection: 'column' }}
+        sx={{ height: 'calc(100dvh - 62px)', bgcolor: '#f5f0eb', display: 'flex', flexDirection: 'column' }}
       >
         <Box sx={{ flex: 1, p: 3, overflowY: 'auto' }}>
           <Typography
