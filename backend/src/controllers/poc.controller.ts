@@ -31,12 +31,21 @@ export class PocController {
     return this.poc.getUnitDashboard(user);
   }
 
-  @Post('shipments/:id/verify')
-  async verifyShipment(
+  @Post('shipments/:id/confirm-arrival')
+  async confirmArrival(
     @Headers('x-user-id') userId: string | undefined,
     @Param('id') shipmentId: string,
   ) {
     const user = await this.requirePoc(userId);
-    return this.poc.verifyShipment(user, shipmentId);
+    return this.poc.confirmArrival(user, shipmentId);
+  }
+
+  @Post('shipments/:id/confirm-packages')
+  async confirmPackages(
+    @Headers('x-user-id') userId: string | undefined,
+    @Param('id') shipmentId: string,
+  ) {
+    const user = await this.requirePoc(userId);
+    return this.poc.confirmPackages(user, shipmentId);
   }
 }

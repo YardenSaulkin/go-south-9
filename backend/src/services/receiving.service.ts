@@ -38,12 +38,12 @@ export class ReceivingService {
     if (orgScopeId) {
       const scope = await db.orgScope.findUnique({ where: { id: orgScopeId } });
       if (!scope) throw new NotFoundException('המסגרת הארגונית לא נמצאה');
-      assertCanAccessMador(user.access, scope.mador);
+      assertCanAccessOrgScope(user.access, scope.mador, scope.orgCode ?? null);
     }
 
     const shipments = await db.shipment.findMany({
       where: {
-        status: { in: [ShipmentStatus.sent, ShipmentStatus.arrived] },
+        status: ShipmentStatus.arrived,
         ...(orgScopeId
           ? { orgScopeId }
           : user.access.canViewGlobalShipmentsDashboard
@@ -83,8 +83,8 @@ export class ReceivingService {
       input.arrivedPackingUnitIds,
     );
     if (!input.finalConfirmation) return { ...summary, finalized: false };
-    if (shipment.status !== ShipmentStatus.sent) {
-      throw new ConflictException('ההובלה כבר נקלטה או השתנתה. יש לרענן.');
+    if (shipment.status !== ShipmentStatus.arrived) {
+      throw new ConflictException('יש לוודא שקצין הקישור אישר הגעת ההובלה לפני הקליטה.');
     }
 
     const existingRequest = await db.operationRequest.findUnique({
@@ -112,7 +112,7 @@ export class ReceivingService {
             where: { id: shipmentId },
             include: { packingUnits: true },
           });
-          if (freshShipment.status !== ShipmentStatus.sent) {
+          if (freshShipment.status !== ShipmentStatus.arrived) {
             throw new ConflictException('ההובלה השתנתה בידי משתמש אחר');
           }
 
@@ -160,14 +160,6 @@ export class ReceivingService {
             }
           }
 
-          assertShipmentTransition(
-            freshShipment.status,
-            ShipmentStatus.arrived,
-          );
-          await tx.shipment.update({
-            where: { id: shipmentId },
-            data: { status: ShipmentStatus.arrived },
-          });
           await tx.operationEvent.create({
             data: {
               actorUserId: user.id,
@@ -175,10 +167,7 @@ export class ReceivingService {
               entityId: shipmentId,
               action: 'receiving_finalized',
               previousState: { status: freshShipment.status },
-              nextState: {
-                status: ShipmentStatus.arrived,
-                ...summary,
-              },
+              nextState: { ...summary },
             },
           });
 

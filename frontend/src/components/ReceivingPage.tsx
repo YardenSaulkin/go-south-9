@@ -127,7 +127,7 @@ function Screen({ title, onBack, nav, children, footer }: ScreenProps) {
       dir="rtl"
       sx={{
         width: '100vw',
-        height: '100dvh',
+        height: 'calc(100dvh - 62px)',
         position: 'relative',
         backgroundImage: 'url(/desert-bg.jpg)',
         backgroundSize: 'cover',
