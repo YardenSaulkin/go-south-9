@@ -70,7 +70,7 @@ export default function App() {
   else if (pathname === '/poc/dashboard') page = <PocDashboardPage userId={user.id} />
   else if (pathname === '/status/shipments') page = <ShipmentsStatusPage userId={user.id} />
   else if (pathname === '/status/packing-units') page = <PackingUnitsStatusPage userId={user.id} />
-  else if (pathname === '/packing') page = <PackingUnitPage onBack={handleBack} orgScope={{ mador: user.orgCode?.substring(4, 6) }} />
+  else if (pathname === '/packing') page = <PackingUnitPage onBack={handleBack} orgScope={{ mador: user.orgCode?.substring(4, 6) }} userId={user.id} orgScopeId={user.orgScopeId} />
   else if (pathname === '/distribution') page = <DistributionPage onBack={handleBack} userId={user.id} orgScopeId={user.orgScopeId} />
   else if (pathname === '/transport') page = <ShipmentPage onBack={handleBack} userId={user.id} orgScopeId={user.orgScopeId} />
   else if (pathname === '/receiving') page = <ReceivingPage userId={user.id} onExit={handleBack} onNavigate={handleNavigate} />

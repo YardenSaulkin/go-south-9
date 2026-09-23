@@ -1,58 +1,29 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Box,
   Typography,
   IconButton,
-  Checkbox,
-  Menu,
-  MenuItem,
   Snackbar,
+  CircularProgress,
+  Alert,
   createTheme,
   ThemeProvider,
 } from '@mui/material'
-import { ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import PackingUnitSummaryModal from './PackingUnitSummaryModal'
+import { fetchEligibleItems, createPackingUnit, type EligibleItem } from '../lib/api'
 
 const theme = createTheme({
   direction: 'rtl',
   typography: { fontFamily: 'Heebo, sans-serif' },
 })
 
-interface PackingUnit {
-  id: number
-  name: string
-  count: number
-  expanded: boolean
-  subItems: { id: string; checked: boolean }[]
-}
-
-const PACKAGING_TYPES = ['קרטון מקוטע', 'קרטון אחיד', 'פלסטיק', 'זולב', 'תולדות']
-const ROOMS = ['חדר 1', 'חדר 2', 'חדר 3']
-const WAREHOUSES = ['מחסן א׳', 'מחסן ב׳', 'מחסן ג׳']
-const FLOORS = ['קומה 1', 'קומה 2', 'קומה 3']
-const BUILDINGS = ['בניין א׳', 'בניין ב׳', 'בניין ג׳']
-
-const INITIAL_ITEMS: PackingUnit[] = [
-  {
-    id: 1,
-    name: 'מחשב',
-    count: 4,
-    expanded: true,
-    subItems: [
-      { id: 'id-001', checked: false },
-      { id: 'id-002', checked: false },
-    ],
-  },
-  {
-    id: 2,
-    name: 'מסך',
-    count: 8,
-    expanded: false,
-    subItems: [
-      { id: 'id-003', checked: false },
-      { id: 'id-004', checked: false },
-    ],
-  },
+const PACKAGING_TYPES = [
+  { label: 'קרטון אישי', value: 'personal_carton' },
+  { label: 'קרטון מקצועי', value: 'professional_carton' },
+  { label: 'פלט', value: 'pallet' },
+  { label: 'זולב', value: 'dolav' },
+  { label: 'גוש', value: 'bulk' },
 ]
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -72,163 +43,110 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-interface CustomSelectProps {
-  value: string
-  placeholder: string
-  options: string[]
-  onChange: (val: string) => void
-}
-
-function CustomSelect({ value, placeholder, options, onChange }: CustomSelectProps) {
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
-  const open = Boolean(anchorEl)
-
-  return (
-    <>
-      <Box
-        onClick={(e) => setAnchorEl(e.currentTarget)}
-        sx={{
-          backgroundColor: 'rgba(246, 230, 195, 0.85)',
-          border: '1px solid rgba(200, 160, 100, 0.4)',
-          borderRadius: '12px',
-          px: '14px',
-          py: '10px',
-          fontFamily: 'Heebo, sans-serif',
-          fontSize: '0.9rem',
-          color: value ? '#3d2008' : '#b08060',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          userSelect: 'none',
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <ChevronDown size={16} color="#8B5E3C" style={{ flexShrink: 0 }} />
-        <span style={{ textAlign: 'right', flex: 1 }}>{value || placeholder}</span>
-      </Box>
-      <Menu
-        anchorEl={anchorEl}
-        open={open}
-        onClose={() => setAnchorEl(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        slotProps={{
-          paper: {
-            sx: {
-              mt: '4px',
-              borderRadius: '12px',
-              backgroundColor: 'rgba(246, 230, 195, 0.97)',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-              border: '1px solid rgba(200, 160, 100, 0.4)',
-              minWidth: 140,
-              overflow: 'hidden',
-            },
-          },
-        }}
-      >
-        {options.map((opt) => (
-          <MenuItem
-            key={opt}
-            onClick={() => {
-              onChange(opt)
-              setAnchorEl(null)
-            }}
-            selected={opt === value}
-            sx={{
-              fontFamily: 'Heebo, sans-serif',
-              fontSize: '0.9rem',
-              color: '#3d2008',
-              justifyContent: 'flex-end',
-              direction: 'rtl',
-              py: '10px',
-              px: '16px',
-              '&.Mui-selected': {
-                backgroundColor: 'rgba(139, 94, 60, 0.15)',
-                fontWeight: 700,
-              },
-              '&:hover': { backgroundColor: 'rgba(139, 94, 60, 0.1)' },
-            }}
-          >
-            {opt}
-          </MenuItem>
-        ))}
-      </Menu>
-    </>
-  )
-}
-
 export interface PackingUnitPageProps {
   onBack: () => void
   user?: { name: string; personalNumber?: string; role?: string } | null
   orgScope?: { mador?: string } | null
+  userId: string | null
+  orgScopeId: string | null
 }
 
-export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitPageProps) {
-  const [packagingType, setPackagingType] = useState('קרטון מקוטע')
-  const [items, setItems] = useState<PackingUnit[]>(INITIAL_ITEMS)
-  const [sourceText, setSourceText] = useState('')
-  const [branch, setBranch] = useState('')
-  const [room, setRoom] = useState('')
-  const [warehouse, setWarehouse] = useState('')
-  const [destText, setDestText] = useState('')
-  const [floor, setFloor] = useState('')
-  const [building, setBuilding] = useState('')
+export default function PackingUnitPage({ onBack, user, orgScope, userId, orgScopeId }: PackingUnitPageProps) {
+  const [packingUnitType, setPackingUnitType] = useState('personal_carton')
+  const [items, setItems] = useState<(EligibleItem & { checked: boolean })[]>([])
+  const [itemsLoading, setItemsLoading] = useState(false)
+  const [itemsError, setItemsError] = useState<string | null>(null)
+  const [sourceUnit, setSourceUnit] = useState('')
+  const [sourceBranch, setSourceBranch] = useState('')
+  const [sourceWarehouse, setSourceWarehouse] = useState('')
+  const [sourceRoom, setSourceRoom] = useState('')
+  const [destBuilding, setDestBuilding] = useState('')
+  const [destFloor, setDestFloor] = useState('')
+  const [destRoom, setDestRoom] = useState('')
   const [toastOpen, setToastOpen] = useState(false)
+  const [toastMsg, setToastMsg] = useState('לא כל השדות הנדרשים מולאו')
   const [summaryOpen, setSummaryOpen] = useState(false)
-  const [serialNumber, setSerialNumber] = useState('56789')
+  const [submitting, setSubmitting] = useState(false)
+  const [displaySerial, setDisplaySerial] = useState('')
 
-  const anyItemChecked = items.some((item) => item.subItems.some((s) => s.checked))
-  const allFilled = branch && room && warehouse && floor && building && anyItemChecked
-
-  const toggleItem = (id: number) => {
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, expanded: !item.expanded } : item))
-    )
+  const loadItems = () => {
+    if (!orgScopeId || !userId) return
+    setItemsLoading(true)
+    setItemsError(null)
+    fetchEligibleItems(orgScopeId, userId)
+      .then((fetched) => setItems(fetched.map((item) => ({ ...item, checked: false }))))
+      .catch((e) => setItemsError(e instanceof Error ? e.message : 'שגיאה בטעינת פריטים'))
+      .finally(() => setItemsLoading(false))
   }
 
-  const toggleSubItem = (itemId: number, subId: string) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              subItems: item.subItems.map((s) =>
-                s.id === subId ? { ...s, checked: !s.checked } : s
-              ),
-            }
-          : item
-      )
-    )
+  useEffect(() => {
+    loadItems()
+  }, [orgScopeId, userId])
+
+  const toggleItem = (id: string) => {
+    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, checked: !item.checked } : item)))
   }
 
-  const toggleAllSubItems = (itemId: number, checkAll: boolean) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId
-          ? { ...item, subItems: item.subItems.map((s) => ({ ...s, checked: checkAll })) }
-          : item
-      )
-    )
-  }
+  const anyItemChecked = items.some((item) => item.checked)
+  const allFilled =
+    destBuilding.trim() &&
+    destFloor.trim() &&
+    destRoom.trim() &&
+    (packingUnitType === 'personal_carton' || anyItemChecked)
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     if (!allFilled) {
+      setToastMsg('לא כל השדות הנדרשים מולאו')
       setToastOpen(true)
       return
     }
-    setSummaryOpen(true)
+    if (!orgScopeId || !userId) {
+      setToastMsg('חסרים פרטי משתמש')
+      setToastOpen(true)
+      return
+    }
+
+    const typeLabel = PACKAGING_TYPES.find((t) => t.value === packingUnitType)?.label ?? packingUnitType
+    const descParts = [typeLabel, sourceUnit && `יחידה ${sourceUnit}`, sourceBranch && `ענף ${sourceBranch}`].filter(Boolean)
+    const description = descParts.join(' - ')
+
+    const selectedItems = items
+      .filter((item) => item.checked)
+      .map((item) => ({ itemId: item.id, quantity: item.quantity }))
+
+    const sourceParts = [sourceWarehouse, sourceRoom].filter(Boolean)
+
+    setSubmitting(true)
+    try {
+      const result = await createPackingUnit(
+        {
+          idempotencyKey: crypto.randomUUID(),
+          orgScopeId,
+          description,
+          packingUnitType,
+          ...(sourceParts.length > 0 && { sourceDescription: sourceParts.join(', ') }),
+          destination: {
+            building: destBuilding.trim(),
+            floor: destFloor.trim(),
+            room: destRoom.trim(),
+          },
+          items: selectedItems,
+        },
+        userId,
+      )
+      setDisplaySerial(result.displaySerial)
+      setSummaryOpen(true)
+    } catch (e) {
+      setToastMsg(e instanceof Error ? e.message : 'שגיאה ביצירת יחידת האריזה')
+      setToastOpen(true)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleContinuePacking = () => {
     setSummaryOpen(false)
-    setItems((prev) =>
-      prev.map((item) => ({
-        ...item,
-        subItems: item.subItems.map((s) => ({ ...s, checked: false })),
-      }))
-    )
-    setSerialNumber(String(Math.floor(10000 + Math.random() * 90000)))
+    loadItems()
   }
 
   const handleExitPacking = () => {
@@ -257,6 +175,7 @@ export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitP
     outline: 'none',
     width: '100%',
     direction: 'rtl' as const,
+    boxSizing: 'border-box' as const,
   }
 
   return (
@@ -346,9 +265,9 @@ export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitP
               <Box sx={{ flex: 1 }}>
                 <Box
                   component="input"
-                  value={sourceText}
+                  value={sourceUnit}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setSourceText(e.target.value.replace(/\D/g, '').slice(0, 2))
+                    setSourceUnit(e.target.value.replace(/\D/g, '').slice(0, 2))
                   }
                   placeholder="קוד יחידה"
                   inputMode="numeric"
@@ -359,9 +278,9 @@ export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitP
               <Box sx={{ flex: 1 }}>
                 <Box
                   component="input"
-                  value={branch}
+                  value={sourceBranch}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setBranch(e.target.value.replace(/\D/g, '').slice(0, 2))
+                    setSourceBranch(e.target.value.replace(/\D/g, '').slice(0, 2))
                   }
                   placeholder="קוד ענף"
                   inputMode="numeric"
@@ -372,19 +291,21 @@ export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitP
             </Box>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Box sx={{ flex: 1 }}>
-                <CustomSelect
-                  value={warehouse}
-                  placeholder="בחר מחסן"
-                  options={WAREHOUSES}
-                  onChange={setWarehouse}
+                <Box
+                  component="input"
+                  value={sourceWarehouse}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSourceWarehouse(e.target.value)}
+                  placeholder="שם מחסן"
+                  sx={inputSx}
                 />
               </Box>
               <Box sx={{ flex: 1 }}>
-                <CustomSelect
-                  value={room}
-                  placeholder="בחר מחדר"
-                  options={ROOMS}
-                  onChange={setRoom}
+                <Box
+                  component="input"
+                  value={sourceRoom}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSourceRoom(e.target.value)}
+                  placeholder="מספר חדר"
+                  sx={inputSx}
                 />
               </Box>
             </Box>
@@ -395,11 +316,11 @@ export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitP
             <SectionLabel>בחר סוג אריזה</SectionLabel>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               {PACKAGING_TYPES.map((type) => {
-                const selected = packagingType === type
+                const selected = packingUnitType === type.value
                 return (
                   <Box
-                    key={type}
-                    onClick={() => setPackagingType(type)}
+                    key={type.value}
+                    onClick={() => setPackingUnitType(type.value)}
                     sx={{
                       px: 2,
                       py: '6px',
@@ -419,7 +340,7 @@ export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitP
                       WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    {type}
+                    {type.label}
                   </Box>
                 )
               })}
@@ -429,125 +350,81 @@ export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitP
           {/* בחר פריטים לארוז */}
           <Box sx={sectionCardSx}>
             <SectionLabel>בחר פריטים לארוז</SectionLabel>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {items.map((item) => (
-                <Box key={item.id}>
+            {itemsLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                <CircularProgress size={28} sx={{ color: '#8B5E3C' }} />
+              </Box>
+            ) : itemsError ? (
+              <Alert
+                severity="error"
+                onClose={() => setItemsError(null)}
+                sx={{ fontFamily: 'Heebo, sans-serif', borderRadius: '12px' }}
+              >
+                {itemsError}
+              </Alert>
+            ) : items.length === 0 ? (
+              <Typography
+                sx={{
+                  fontFamily: 'Heebo, sans-serif',
+                  fontSize: '0.88rem',
+                  color: '#8B5E3C',
+                  textAlign: 'center',
+                  py: 1,
+                }}
+              >
+                אין פריטים זמינים לאריזה
+              </Typography>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {items.map((item) => (
                   <Box
+                    key={item.id}
                     onClick={() => toggleItem(item.id)}
                     sx={{
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      backgroundColor: 'rgba(246, 230, 195, 0.85)',
-                      borderRadius: item.expanded ? '12px 12px 0 0' : '12px',
+                      gap: 2,
+                      borderRadius: '12px',
                       px: 1.5,
                       py: 1,
                       cursor: 'pointer',
                       userSelect: 'none',
                       WebkitTapHighlightColor: 'transparent',
-                      border: '1px solid rgba(200, 160, 100, 0.3)',
-                      borderBottom: item.expanded
-                        ? '1px solid rgba(200, 160, 100, 0.15)'
+                      border: item.checked
+                        ? '1px solid rgba(139, 94, 60, 0.6)'
                         : '1px solid rgba(200, 160, 100, 0.3)',
+                      backgroundColor: item.checked
+                        ? 'rgba(139, 94, 60, 0.35)'
+                        : 'rgba(246, 230, 195, 0.85)',
+                      transition: 'background-color 0.15s ease, border-color 0.15s ease',
                     }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      {item.expanded ? (
-                        <ChevronUp size={18} color="#8B5E3C" />
-                      ) : (
-                        <ChevronDown size={18} color="#8B5E3C" />
-                      )}
-                      <Typography
-                        sx={{
-                          fontFamily: 'Heebo, sans-serif',
-                          fontSize: '0.85rem',
-                          color: '#6e4e37',
-                          fontWeight: 500,
-                        }}
-                      >
-                        כמות: {item.count}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography
-                        sx={{
-                          fontFamily: 'Heebo, sans-serif',
-                          fontSize: '0.9rem',
-                          fontWeight: 700,
-                          color: '#3d2008',
-                        }}
-                      >
-                        {item.name}
-                      </Typography>
-                      <Checkbox
-                        size="small"
-                        checked={item.subItems.every((s) => s.checked)}
-                        indeterminate={
-                          item.subItems.some((s) => s.checked) &&
-                          !item.subItems.every((s) => s.checked)
-                        }
-                        onChange={(e) => {
-                          e.stopPropagation()
-                          toggleAllSubItems(item.id, e.target.checked)
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        sx={{
-                          p: 0,
-                          color: '#8B5E3C',
-                          '&.Mui-checked': { color: '#8B5E3C' },
-                          '&.MuiCheckbox-indeterminate': { color: '#8B5E3C' },
-                        }}
-                      />
-                    </Box>
-                  </Box>
-
-                  {item.expanded && (
-                    <Box
+                    <Typography
                       sx={{
-                        backgroundColor: 'rgba(250, 238, 210, 0.75)',
-                        borderRadius: '0 0 12px 12px',
-                        border: '1px solid rgba(200, 160, 100, 0.3)',
-                        borderTop: 'none',
-                        overflow: 'hidden',
+                        fontFamily: 'Heebo, sans-serif',
+                        fontSize: '0.85rem',
+                        color: item.checked ? '#3d2008' : '#6e4e37',
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
                       }}
                     >
-                      {item.subItems.map((sub, sIdx) => (
-                        <Box
-                          key={sub.id}
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            px: 1.5,
-                            py: '8px',
-                            borderBottom:
-                              sIdx < item.subItems.length - 1
-                                ? '1px solid rgba(200, 160, 100, 0.2)'
-                                : 'none',
-                          }}
-                        >
-                          <Checkbox
-                            size="small"
-                            checked={sub.checked}
-                            onChange={() => toggleSubItem(item.id, sub.id)}
-                            sx={{ p: 0, color: '#8B5E3C', '&.Mui-checked': { color: '#8B5E3C' } }}
-                          />
-                          <Typography
-                            sx={{
-                              fontFamily: 'Heebo, sans-serif',
-                              fontSize: '0.85rem',
-                              color: '#6e4e37',
-                            }}
-                          >
-                            {item.name} ={sub.id}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  )}
-                </Box>
-              ))}
-            </Box>
+                      כמות: {item.quantity}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontFamily: 'Heebo, sans-serif',
+                        fontSize: '0.9rem',
+                        fontWeight: 700,
+                        color: '#3d2008',
+                      }}
+                    >
+                      {item.description}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            )}
           </Box>
 
           {/* לאן שולחים */}
@@ -557,28 +434,28 @@ export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitP
               <Box sx={{ flex: 1 }}>
                 <Box
                   component="input"
-                  value={destText}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setDestText(e.target.value)
-                  }
-                  placeholder="ו"
+                  value={destRoom}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDestRoom(e.target.value)}
+                  placeholder="מספר חדר"
                   sx={inputSx}
                 />
               </Box>
               <Box sx={{ flex: 1 }}>
-                <CustomSelect
-                  value={floor}
-                  placeholder="בחר קומה"
-                  options={FLOORS}
-                  onChange={setFloor}
+                <Box
+                  component="input"
+                  value={destFloor}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDestFloor(e.target.value)}
+                  placeholder="קומה"
+                  sx={inputSx}
                 />
               </Box>
             </Box>
-            <CustomSelect
-              value={building}
-              placeholder="בחר בניין"
-              options={BUILDINGS}
-              onChange={setBuilding}
+            <Box
+              component="input"
+              value={destBuilding}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDestBuilding(e.target.value)}
+              placeholder="בניין"
+              sx={inputSx}
             />
           </Box>
         </Box>
@@ -596,24 +473,28 @@ export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitP
           }}
         >
           <Box
-            onClick={handleFinish}
+            onClick={submitting ? undefined : handleFinish}
             sx={{
               width: '100%',
               py: '14px',
               borderRadius: '999px',
-              backgroundColor: allFilled ? '#8B5E3C' : 'rgba(139, 94, 60, 0.4)',
-              color: allFilled ? 'white' : 'rgba(255,255,255,0.6)',
+              backgroundColor: allFilled && !submitting ? '#8B5E3C' : 'rgba(139, 94, 60, 0.4)',
+              color: allFilled && !submitting ? 'white' : 'rgba(255,255,255,0.6)',
               fontFamily: 'Heebo, sans-serif',
               fontWeight: 700,
               fontSize: '1.05rem',
               textAlign: 'center',
-              cursor: allFilled ? 'pointer' : 'default',
-              boxShadow: allFilled ? '0 4px 16px rgba(0,0,0,0.25)' : 'none',
+              cursor: allFilled && !submitting ? 'pointer' : 'default',
+              boxShadow: allFilled && !submitting ? '0 4px 16px rgba(0,0,0,0.25)' : 'none',
               letterSpacing: 0.5,
               WebkitTapHighlightColor: 'transparent',
               userSelect: 'none',
               transition: 'all 0.2s ease',
-              ...(allFilled && {
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
+              ...(allFilled && !submitting && {
                 '&:active': {
                   transform: 'scale(0.97)',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
@@ -621,31 +502,31 @@ export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitP
               }),
             }}
           >
-            סיום אריזה
+            {submitting ? <CircularProgress size={20} sx={{ color: 'rgba(255,255,255,0.8)' }} /> : 'סיום אריזה'}
           </Box>
         </Box>
 
         {/* Packing Unit Summary Modal */}
         <PackingUnitSummaryModal
           open={summaryOpen}
-          serialNumber={serialNumber}
+          serialNumber={displaySerial}
           source={{
-            unit: sourceText || '',
-            anaf: branch || '',
+            unit: sourceUnit || '',
+            anaf: sourceBranch || '',
             mador: orgScope?.mador || '',
-            room: room || warehouse || 'חדר 208',
+            room: [sourceWarehouse, sourceRoom].filter(Boolean).join(', '),
           }}
           destination={{
-            building: building || 'בניין A',
-            floor: floor || 'קומה 3',
-            room: destText || 'חדר 309',
+            building: destBuilding,
+            floor: destFloor,
+            room: destRoom,
           }}
           madorSupervisor="שם אחראי"
           roomSupervisor="שם אחראי"
           packerName={
             user?.name
-              ? `${user.name} ${user.personalNumber || '9223345'}`
-              : 'שימי שמעוני 9223345'
+              ? `${user.name} ${user.personalNumber || ''}`
+              : 'שם אורז'
           }
           onContinue={handleContinuePacking}
           onExit={handleExitPacking}
@@ -657,7 +538,7 @@ export default function PackingUnitPage({ onBack, user, orgScope }: PackingUnitP
           autoHideDuration={2500}
           onClose={() => setToastOpen(false)}
           anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-          message="לא כל השדות הנדרשים מולאו"
+          message={toastMsg}
           slotProps={{
             content: {
               sx: {
