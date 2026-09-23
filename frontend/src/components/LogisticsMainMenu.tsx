@@ -21,7 +21,6 @@ import {
   PackageOpen,
   LayoutGrid,
   Users,
-  BarChart3,
   type LucideIcon,
   LogOut,
 } from "lucide-react";
@@ -69,7 +68,6 @@ const ADMIN_CARDS: ActionCardItem[] = [
   { label: "ניהול משתמשים", route: "admin", Icon: Users },
 ];
 
-const POC_CARDS: ActionCardItem[] = [];
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "מנהל",

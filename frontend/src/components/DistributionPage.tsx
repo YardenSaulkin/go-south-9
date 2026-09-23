@@ -24,7 +24,6 @@ import {
   distributePackingUnit,
   type DistributionPackingUnit,
 } from '../lib/api'
-import { navigate } from '../navigation'
 
 const theme = createTheme({
   direction: 'rtl',
