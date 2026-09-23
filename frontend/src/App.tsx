@@ -15,10 +15,20 @@ import PackingUnitPage from './components/PackingUnitPage'
 import ShipmentPage from './components/ShipmentPage'
 import DistributionPage from './components/DistributionPage'
 import ReceivingPage from './components/ReceivingPage'
+import FacilityHomePage from './facility/pages/FacilityHomePage'
+import ReportFlowPage from './facility/pages/ReportFlowPage'
+import MyReportsPage from './facility/pages/MyReportsPage'
+import RoomsFlowPage from './facility/pages/RoomsFlowPage'
+import CompoundNavigationPage from './facility/pages/CompoundNavigationPage'
+import FacilityInsightsPage from './facility/pages/FacilityInsightsPage'
 import { useCurrentUser } from './auth/useCurrentUser'
 import { clearCurrentUser, userDisplayName } from './auth/session'
 
 const NO_NAVBAR_ROUTES = ['/home', '/login', '/signup']
+
+// Facility mode brings its own bottom navigation, so the logistics one stays
+// off on every screen inside it.
+const FACILITY_ROUTE_PREFIX = '/facility'
 
 type NavigateRoute = 'packing' | 'transport' | 'receiving' | 'distribution' | 'admin' | 'poc'
 
@@ -56,7 +66,8 @@ export default function App() {
     navigate('/home')
   }
 
-  const showNavBar = !!user && !NO_NAVBAR_ROUTES.includes(pathname)
+  const inFacilityMode = pathname.startsWith(FACILITY_ROUTE_PREFIX)
+  const showNavBar = !!user && !inFacilityMode && !NO_NAVBAR_ROUTES.includes(pathname)
   const navActive =
     pathname === '/status/shipments' ? 'shipments' :
     pathname === '/status/packing-units' ? 'packing-units' :
@@ -68,7 +79,13 @@ export default function App() {
   if (!user) return <HomePage />
 
   let page: ReactNode
-  if (pathname === '/admin/users') page = <AdminUsersPage userId={user.id} />
+  if (pathname === '/facility') page = <FacilityHomePage user={user} />
+  else if (pathname === '/facility/report') page = <ReportFlowPage />
+  else if (pathname === '/facility/reports') page = <MyReportsPage />
+  else if (pathname === '/facility/rooms') page = <RoomsFlowPage />
+  else if (pathname === '/facility/navigate') page = <CompoundNavigationPage />
+  else if (pathname === '/facility/insights') page = <FacilityInsightsPage />
+  else if (pathname === '/admin/users') page = <AdminUsersPage userId={user.id} />
   else if (pathname === '/poc/dashboard') page = <PocDashboardPage userId={user.id} />
   else if (pathname === '/status/shipments') page = <ShipmentsStatusPage userId={user.id} />
   else if (pathname === '/status/packing-units') page = <PackingUnitsStatusPage userId={user.id} />
@@ -82,6 +99,7 @@ export default function App() {
       <LogisticsMainMenu
         user={{ name: userDisplayName(user), personalNumber: user.personalNumber ?? undefined, role: user.role }}
         onNavigate={handleNavigate}
+        onEnterFacilityMode={() => navigate('/facility')}
         onLogout={handleLogout}
       />
     </>

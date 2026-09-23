@@ -10,6 +10,8 @@ import { ContextController } from './controllers/context.controller.js';
 import { StatusController } from './controllers/status.controller.js';
 import { DashboardController } from './controllers/dashboard.controller.js';
 import { DistributionController } from './controllers/distribution.controller.js';
+import { FacilityController } from './controllers/facility.controller.js';
+import { RoomController } from './controllers/room.controller.js';
 import { PackingController } from './controllers/packing.controller.js';
 import { ReceivingController } from './controllers/receiving.controller.js';
 import { ShipmentController } from './controllers/shipment.controller.js';
@@ -18,6 +20,10 @@ import { PocService } from './services/poc.service.js';
 import { AuthService } from './services/auth.service.js';
 import { DashboardService } from './services/dashboard.service.js';
 import { DistributionService } from './services/distribution.service.js';
+import { FacilityAiService } from './services/facility-ai.service.js';
+import { FacilityInsightsService } from './services/facility-insights.service.js';
+import { FacilityReportService } from './services/facility-report.service.js';
+import { RoomService } from './services/room.service.js';
 import { PackingService } from './services/packing.service.js';
 import { ReceivingService } from './services/receiving.service.js';
 import { ShipmentService } from './services/shipment.service.js';
@@ -56,6 +62,8 @@ const observeAppSecret = process.env.OBSERVE_APP_SECRET;
     DashboardController,
     PocController,
     StatusController,
+    FacilityController,
+    RoomController,
   ],
   providers: [
     AppService,
@@ -69,6 +77,10 @@ const observeAppSecret = process.env.OBSERVE_APP_SECRET;
     DashboardService,
     PocService,
     StatusService,
+    FacilityAiService,
+    FacilityReportService,
+    FacilityInsightsService,
+    RoomService,
   ],
 })
 export class AppModule {}

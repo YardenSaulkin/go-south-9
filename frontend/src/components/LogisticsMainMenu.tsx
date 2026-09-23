@@ -21,9 +21,9 @@ import {
   PackageOpen,
   LayoutGrid,
   Users,
-  BarChart3,
   type LucideIcon,
   LogOut,
+  Building2,
 } from "lucide-react";
 
 interface User {
@@ -50,6 +50,8 @@ interface ActionCardItem {
 export interface MainMenuProps {
   user: User;
   onNavigate: (route: NavigateRoute) => void;
+  // Entry point into facility mode — managing the compound after the move.
+  onEnterFacilityMode: () => void;
   onLogout: () => void;
 }
 
@@ -66,8 +68,6 @@ const RECEIVING_CARDS: ActionCardItem[] = [
 const ADMIN_CARDS: ActionCardItem[] = [
   { label: "ניהול משתמשים", route: "admin", Icon: Users },
 ];
-
-const POC_CARDS: ActionCardItem[] = [];
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "מנהל",
@@ -97,6 +97,7 @@ function getInitials(name: string): string {
 export default function LogisticsMainMenu({
   user,
   onNavigate,
+  onEnterFacilityMode,
   onLogout,
 }: MainMenuProps) {
   const [activeTab, setActiveTab] = useState<TabValue>("sending");
@@ -263,6 +264,34 @@ export default function LogisticsMainMenu({
                 התנתק
               </MenuItem>
             </Menu>
+          </Box>
+
+          {/* Mode switch + role shortcut buttons */}
+          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Button
+              onClick={onEnterFacilityMode}
+              startIcon={<Building2 size={16} />}
+              size="small"
+              sx={{
+                fontFamily: 'Heebo, sans-serif',
+                fontWeight: 600,
+                fontSize: '0.82rem',
+                textTransform: 'none',
+                color: 'white',
+                bgcolor: 'rgba(139,94,60,0.55)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: '999px',
+                px: 2,
+                py: 0.5,
+                gap: 0.75,
+                '& .MuiButton-startIcon': { margin: 0 },
+                '&:hover': { bgcolor: 'rgba(139,94,60,0.75)' },
+              }}
+            >
+              ניהול המתחם
+            </Button>
           </Box>
 
           {/* Role shortcut buttons — admin/POC only */}
