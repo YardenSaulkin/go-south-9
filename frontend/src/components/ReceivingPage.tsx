@@ -16,7 +16,6 @@ import {
   Truck,
   Package,
   AlertTriangle,
-  Home,
 } from "lucide-react";
 import {
   fetchReceivingShipments,
@@ -81,7 +80,7 @@ interface ScreenProps {
   footer?: React.ReactNode;
 }
 
-function Screen({ title, onBack, nav, children, footer }: ScreenProps) {
+function Screen({ title, onBack, children, footer }: ScreenProps) {
   return (
     <Box
       dir="rtl"

@@ -3,8 +3,6 @@ import {
   Box,
   Typography,
   IconButton,
-  Dialog,
-  DialogContent,
   CircularProgress,
   createTheme,
   ThemeProvider,

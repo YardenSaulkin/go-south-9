@@ -102,7 +102,6 @@ function scopeOptions(
   for (const scope of scopes) {
     const value = scopeCode(scope, field);
     if (!value) continue;
-    const name = scope[field];
     values.set(value, value);
   }
   return [...values].map(([value, label]) => ({ value, label }));
