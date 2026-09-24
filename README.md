@@ -1,5 +1,3 @@
-![pwned67](https://i.imgur.com/OkhocNz.jpeg)
-
 # go-south-9
 Team 9's Go-south project for the hackathon
 
